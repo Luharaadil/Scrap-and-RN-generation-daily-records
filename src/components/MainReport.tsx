@@ -43,9 +43,13 @@ export function MainReport() {
   };
 
   useEffect(() => {
+    let active = true;
     if (date?.from && date?.to) {
-      loadData();
+      loadData().then(() => {
+        if (!active) return;
+      });
     }
+    return () => { active = false; };
   }, [date]);
 
   const days = date?.from && date?.to 
@@ -182,7 +186,7 @@ export function MainReport() {
       onDoubleClick={() => setDetailModal({ date: d, type })}
       title="Double click to view scrap details"
     >
-      {value === null || value === undefined || value === '' ? '' : value}
+      {value === null || value === undefined || value === '' || Number(value) === 0 ? '' : value}
     </TableCell>
   );
 

@@ -3,15 +3,33 @@ const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwgP4jhdt0rom8RB3r3
 export const getWebAppUrl = () => WEB_APP_URL;
 
 export const fetchSummaryAndScraps = async (date: string) => {
-  const response = await fetch(`${WEB_APP_URL}?action=getData&date=${date}`);
-  if (!response.ok) throw new Error('Network response was not ok');
-  return response.json();
+  try {
+    const response = await fetch(`${WEB_APP_URL}?action=getData&date=${date}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Fetch error:', response.status, errorText);
+      throw new Error(`Network response was not ok: ${response.status} ${errorText}`);
+    }
+    return response.json();
+  } catch (error) {
+    console.error('Fetch failed:', error);
+    throw error;
+  }
 };
 
 export const fetchRangeData = async (startDate: string, endDate: string) => {
-  const response = await fetch(`${WEB_APP_URL}?action=getRangeData&startDate=${startDate}&endDate=${endDate}`);
-  if (!response.ok) throw new Error('Network response was not ok');
-  return response.json();
+  try {
+    const response = await fetch(`${WEB_APP_URL}?action=getRangeData&startDate=${startDate}&endDate=${endDate}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Fetch error:', response.status, errorText);
+      throw new Error(`Network response was not ok: ${response.status} ${errorText}`);
+    }
+    return response.json();
+  } catch (error) {
+    console.error('Fetch failed:', error);
+    throw error;
+  }
 };
 
 export const saveProductionSummary = async (data: any) => {

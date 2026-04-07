@@ -150,11 +150,11 @@ export function Dashboard() {
             <div className="space-y-1 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Usage:</span>
-                <span className="font-medium">{summary.bicUsage || 0} kg</span>
+                <span className="font-medium">{summary.bicUsage && Number(summary.bicUsage) !== 0 ? `${summary.bicUsage} kg` : ''}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Scrap:</span>
-                <span className="font-medium text-red-600">{displayBicScrap} kg</span>
+                <span className="font-medium text-red-600">{displayBicScrap && Number(displayBicScrap) !== 0 ? `${displayBicScrap} kg` : ''}</span>
               </div>
               <div className="flex justify-between border-t pt-1 mt-1">
                 <span className="text-muted-foreground">Scrap Rate:</span>
@@ -172,11 +172,11 @@ export function Dashboard() {
             <div className="space-y-1 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Usage:</span>
-                <span className="font-medium">{summary.plyUsage || 0} kg</span>
+                <span className="font-medium">{summary.plyUsage && Number(summary.plyUsage) !== 0 ? `${summary.plyUsage} kg` : ''}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Scrap:</span>
-                <span className="font-medium text-red-600">{displayPlyScrap} kg</span>
+                <span className="font-medium text-red-600">{displayPlyScrap && Number(displayPlyScrap) !== 0 ? `${displayPlyScrap} kg` : ''}</span>
               </div>
               <div className="flex justify-between border-t pt-1 mt-1">
                 <span className="text-muted-foreground">Scrap Rate:</span>
@@ -194,11 +194,11 @@ export function Dashboard() {
             <div className="space-y-1 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Usage:</span>
-                <span className="font-medium">{summary.rubberUsage || 0} kg</span>
+                <span className="font-medium">{summary.rubberUsage && Number(summary.rubberUsage) !== 0 ? `${summary.rubberUsage} kg` : ''}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Scrap:</span>
-                <span className="font-medium text-red-600">{displayRubberScrap} kg</span>
+                <span className="font-medium text-red-600">{displayRubberScrap && Number(displayRubberScrap) !== 0 ? `${displayRubberScrap} kg` : ''}</span>
               </div>
               <div className="flex justify-between border-t pt-1 mt-1">
                 <span className="text-muted-foreground">Scrap Rate:</span>
@@ -216,11 +216,11 @@ export function Dashboard() {
             <div className="space-y-1 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Rubber Usage:</span>
-                <span className="font-medium">{summary.extrusionRubberUsage || 0} kg</span>
+                <span className="font-medium">{summary.extrusionRubberUsage && Number(summary.extrusionRubberUsage) !== 0 ? `${summary.extrusionRubberUsage} kg` : ''}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">RN Scrap:</span>
-                <span className="font-medium text-red-600">{displayRnScrap} kg</span>
+                <span className="font-medium text-red-600">{displayRnScrap && Number(displayRnScrap) !== 0 ? `${displayRnScrap} kg` : ''}</span>
               </div>
               <div className="flex justify-between border-t pt-1 mt-1">
                 <span className="text-muted-foreground">Scrap Rate:</span>
