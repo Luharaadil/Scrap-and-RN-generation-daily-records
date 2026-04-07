@@ -1,0 +1,432 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { format, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns';
+import { Calendar as CalendarIcon, Loader2, RefreshCw, Copy, Image as ImageIcon, Check, X } from 'lucide-react';
+import { toBlob } from 'html-to-image';
+import { Calendar } from '@/src/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/src/components/ui/popover';
+import { Button } from '@/src/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
+import { fetchRangeData, getWebAppUrl } from '@/src/lib/api';
+import { cn } from '@/src/lib/utils';
+import { DateRange } from 'react-day-picker';
+
+export function MainReport() {
+  const [date, setDate] = useState<DateRange | undefined>({
+    from: startOfWeek(new Date(), { weekStartsOn: 1 }),
+    to: endOfWeek(new Date(), { weekStartsOn: 1 }),
+  });
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState<any>(null);
+  const [error, setError] = useState('');
+  const [copiedText, setCopiedText] = useState(false);
+  const [copiedImage, setCopiedImage] = useState(false);
+  const [detailModal, setDetailModal] = useState<{date: Date, type: 'BIC' | 'PLY_CHAFER' | 'RUBBER' | 'RN'} | null>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  const loadData = async () => {
+    if (!getWebAppUrl() || !date?.from || !date?.to) return;
+    
+    setLoading(true);
+    setError('');
+    try {
+      const startDate = format(date.from, 'yyyy-MM-dd');
+      const endDate = format(date.to, 'yyyy-MM-dd');
+      const result = await fetchRangeData(startDate, endDate);
+      console.log('MainReport data:', result);
+      setData(result);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (date?.from && date?.to) {
+      loadData();
+    }
+  }, [date]);
+
+  const days = date?.from && date?.to 
+    ? eachDayOfInterval({ start: date.from, end: date.to }) 
+    : (date?.from ? [date.from] : []);
+
+  const getSummaryForDate = (d: Date) => {
+    const formattedDate = format(d, 'yyyy-MM-dd');
+    const summary = data?.summaries?.find((s: any) => s.date === formattedDate) || {};
+    return {
+      ...summary,
+      extrusionRubberUsage: summary.extrusionRubberUsage ?? 0
+    };
+  };
+
+  const getCustomScrapForDate = (d: Date, type: 'BIC' | 'PLY_CHAFER' | 'RUBBER_MIXING' | 'RN') => {
+    const formattedDate = format(d, 'yyyy-MM-dd');
+    const dayScraps = data?.scraps?.filter((s: any) => s.date === formattedDate) || [];
+    
+    let filtered = [];
+    if (type === 'BIC') {
+      filtered = dayScraps.filter((s: any) => s.material === 'BIC');
+    } else if (type === 'PLY_CHAFER') {
+      filtered = dayScraps.filter((s: any) => 
+        (s.material === 'PLY' || s.material === 'Chafer') && 
+        (s.section === 'Calendering' || s.section === 'Cutting')
+      );
+    } else if (type === 'RUBBER_MIXING') {
+      filtered = dayScraps.filter((s: any) => 
+        s.material === 'Rubber'
+      );
+    } else if (type === 'RN') {
+      filtered = dayScraps.filter((s: any) => s.material === 'Extrusion Rubber');
+    }
+    
+    if (filtered.length === 0) return null;
+    return filtered.reduce((sum: number, s: any) => sum + Number(s.weight || 0), 0);
+  };
+
+  const calculateRate = (scrap: number | null, usage: number | null) => {
+    if (usage === null || usage === undefined || usage === 0) return '';
+    if (scrap === null || scrap === undefined) return '';
+    return ((Number(scrap) / Number(usage)) * 100).toFixed(2) + '%';
+  };
+
+  const copyValuesOnly = () => {
+    if (!days.length) return;
+    
+    const rowsData = [
+      // BIC
+      days.map(d => getSummaryForDate(d).bicUsage || ''),
+      days.map(d => getCustomScrapForDate(d, 'BIC') || ''),
+      days.map(d => calculateRate(getCustomScrapForDate(d, 'BIC'), getSummaryForDate(d).bicUsage)),
+      // PLY + Chafer
+      days.map(d => getSummaryForDate(d).plyUsage || ''),
+      days.map(d => getCustomScrapForDate(d, 'PLY_CHAFER') || ''),
+      days.map(d => calculateRate(getCustomScrapForDate(d, 'PLY_CHAFER'), getSummaryForDate(d).plyUsage)),
+      // Rubber Mixing
+      days.map(d => getSummaryForDate(d).mixingRubberUsage || getSummaryForDate(d).rubberUsage || ''),
+      days.map(d => getCustomScrapForDate(d, 'RUBBER_MIXING') || ''),
+      days.map(d => calculateRate(getCustomScrapForDate(d, 'RUBBER_MIXING'), getSummaryForDate(d).mixingRubberUsage || getSummaryForDate(d).rubberUsage)),
+      // RN
+      days.map(d => getSummaryForDate(d).mixingRubberUsage || getSummaryForDate(d).rubberUsage || ''),
+      days.map(d => getCustomScrapForDate(d, 'RN') || ''),
+      days.map(d => calculateRate(getCustomScrapForDate(d, 'RN'), getSummaryForDate(d).mixingRubberUsage || getSummaryForDate(d).rubberUsage)),
+    ];
+
+    const tsv = rowsData.map(row => row.join('\t')).join('\n');
+    navigator.clipboard.writeText(tsv).then(() => {
+      setCopiedText(true);
+      setTimeout(() => setCopiedText(false), 2000);
+    });
+  };
+
+  const copyAsPicture = async () => {
+    if (!tableRef.current) return;
+    try {
+      const blob = await toBlob(tableRef.current, { 
+        backgroundColor: '#ffffff',
+        pixelRatio: 2
+      });
+      
+      if (!blob) return;
+
+      try {
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        setCopiedImage(true);
+        setTimeout(() => setCopiedImage(false), 2000);
+      } catch (clipboardErr) {
+        console.error('Clipboard write failed, falling back to download', clipboardErr);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Weekly_Report_${format(new Date(), 'yyyyMMdd')}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        setCopiedImage(true);
+        setTimeout(() => setCopiedImage(false), 2000);
+      }
+    } catch (err) {
+      console.error('Failed to generate image', err);
+    }
+  };
+
+  const getFilteredScrapsForModal = () => {
+    if (!detailModal) return [];
+    const formattedDate = format(detailModal.date, 'yyyy-MM-dd');
+    const dayScraps = data?.scraps?.filter((s: any) => s.date === formattedDate) || [];
+    
+    if (detailModal.type === 'BIC') {
+      return dayScraps.filter((s: any) => s.material === 'BIC');
+    } else if (detailModal.type === 'PLY_CHAFER') {
+      return dayScraps.filter((s: any) => 
+        (s.material === 'PLY' || s.material === 'Chafer') && 
+        (s.section === 'Calendering' || s.section === 'Cutting')
+      );
+    } else if (detailModal.type === 'RUBBER_MIXING') {
+      return dayScraps.filter((s: any) => 
+        s.material === 'Rubber' && s.section === 'Mixing'
+      );
+    } else if (detailModal.type === 'RN') {
+      return dayScraps.filter((s: any) => s.material === 'Extrusion Rubber');
+    }
+    return [];
+  };
+
+  const renderCell = (d: Date, type: 'BIC' | 'PLY_CHAFER' | 'RUBBER_MIXING' | 'RN', value: any) => (
+    <TableCell 
+      key={d.toISOString()} 
+      className="border border-gray-300 text-center cursor-pointer hover:bg-black/5 transition-colors"
+      onDoubleClick={() => setDetailModal({ date: d, type })}
+      title="Double click to view scrap details"
+    >
+      {value === null || value === undefined || value === '' ? '' : value}
+    </TableCell>
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+        <div className="flex flex-wrap gap-3 items-center">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                id="date"
+                variant={"outline"}
+                className={cn(
+                  "w-[300px] justify-start text-left font-normal",
+                  !date && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {date?.from ? (
+                  date.to ? (
+                    <>
+                      {format(date.from, "LLL dd, y")} -{" "}
+                      {format(date.to, "LLL dd, y")}
+                    </>
+                  ) : (
+                    format(date.from, "LLL dd, y")
+                  )
+                ) : (
+                  <span>Pick a date range</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                initialFocus
+                mode="range"
+                defaultMonth={date?.from}
+                selected={date}
+                onSelect={setDate}
+                numberOfMonths={2}
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={copyValuesOnly} title="Copy values only (for Excel)">
+            {copiedText ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <Copy className="h-4 w-4 mr-2" />}
+            Copy Values
+          </Button>
+          <Button variant="outline" size="sm" onClick={copyAsPicture} title="Copy table as picture">
+            {copiedImage ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <ImageIcon className="h-4 w-4 mr-2" />}
+            Copy Picture
+          </Button>
+          <Button variant="outline" size="icon" onClick={loadData} disabled={loading}>
+            <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+          </Button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="text-red-500 text-sm font-medium">{error}</div>
+      )}
+
+      <Card className="overflow-hidden">
+        <CardHeader className="text-center pb-2">
+          <CardTitle className="text-2xl">MRI Production Weekly Report MRI 生產週報</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0 overflow-x-auto">
+          <div ref={tableRef} className="bg-white p-4">
+            <Table className="border-collapse border border-gray-300 w-full min-w-[800px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="border border-gray-300 bg-gray-50 font-semibold text-center min-w-[150px] max-w-[250px] whitespace-normal">
+                    <div>Date</div>
+                    <div className="text-sm font-normal text-gray-600">日期</div>
+                  </TableHead>
+                  {days.map((d, i) => (
+                    <TableHead key={i} className="border border-gray-300 bg-gray-50 font-semibold text-center min-w-[80px] text-lg">
+                      {format(d, 'M-d')}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow>
+                  <TableCell className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal">
+                    <div className="text-sm">BIC usage weight (kg)</div>
+                    <div className="text-xs text-gray-500 mt-0.5">鋼絲使用重量(kg)</div>
+                  </TableCell>
+                  {days.map((d) => renderCell(d, 'BIC', getSummaryForDate(d).bicUsage ?? ''))}
+                </TableRow>
+                <TableRow>
+                  <TableCell className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal">
+                    <div className="text-sm">BIC scrapping weight (kg)</div>
+                    <div className="text-xs text-gray-500 mt-0.5">鋼絲報廢公斤數(kg)</div>
+                  </TableCell>
+                  {days.map((d) => renderCell(d, 'BIC', getCustomScrapForDate(d, 'BIC') ?? ''))}
+                </TableRow>
+                <TableRow className="bg-[#e2f0d9]">
+                  <TableCell className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal">
+                    <div className="text-sm">BIC scrap rate (%)</div>
+                    <div className="text-xs text-gray-500 mt-0.5">鋼絲報廢率(%)</div>
+                  </TableCell>
+                  {days.map((d) => renderCell(d, 'BIC', calculateRate(getCustomScrapForDate(d, 'BIC'), getSummaryForDate(d).bicUsage)))}
+                </TableRow>
+
+                {/* PLY + Chafer */}
+                <TableRow>
+                  <TableCell className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal">
+                    <div className="text-sm">PLY & Chafer usage weight (kg)</div>
+                    <div className="text-xs text-gray-500 mt-0.5">簾紗及防擦布使用重量(kg)</div>
+                  </TableCell>
+                  {days.map((d) => renderCell(d, 'PLY_CHAFER', getSummaryForDate(d).plyUsage ?? ''))}
+                </TableRow>
+                <TableRow>
+                  <TableCell className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal">
+                    <div className="text-sm">PLY & Chafer scrap weight (kg)</div>
+                    <div className="text-xs text-gray-500 mt-0.5">簾紗及防擦布報廢公斤數(kg)</div>
+                  </TableCell>
+                  {days.map((d) => renderCell(d, 'PLY_CHAFER', getCustomScrapForDate(d, 'PLY_CHAFER') ?? ''))}
+                </TableRow>
+                <TableRow className="bg-[#fce4d6]">
+                  <TableCell className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal">
+                    <div className="text-sm">PLY & Chafer scrap rate (%)</div>
+                    <div className="text-xs text-gray-500 mt-0.5">簾紗及防擦布報廢率(%)</div>
+                  </TableCell>
+                  {days.map((d) => renderCell(d, 'PLY_CHAFER', calculateRate(getCustomScrapForDate(d, 'PLY_CHAFER'), getSummaryForDate(d).plyUsage)))}
+                </TableRow>
+
+                {/* Rubber (Mixing) */}
+                <TableRow>
+                  <TableCell className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal">
+                    <div className="text-sm">Rubber usage weight (Mixing) (kg)</div>
+                    <div className="text-xs text-gray-500 mt-0.5">膠料使用重量(kg)</div>
+                  </TableCell>
+                  {days.map((d) => renderCell(d, 'RUBBER_MIXING', getSummaryForDate(d).mixingRubberUsage ?? getSummaryForDate(d).rubberUsage ?? ''))}
+                </TableRow>
+                <TableRow>
+                  <TableCell className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal">
+                    <div className="text-sm">Rubber scrap weight (Mixing) (kg)</div>
+                    <div className="text-xs text-gray-500 mt-0.5">膠料報廢公斤數(kg)</div>
+                  </TableCell>
+                  {days.map((d) => renderCell(d, 'RUBBER_MIXING', getCustomScrapForDate(d, 'RUBBER_MIXING') ?? ''))}
+                </TableRow>
+                <TableRow className="bg-[#ddebf7]">
+                  <TableCell className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal">
+                    <div className="text-sm">Rubber scrap rate (Mixing) (%)</div>
+                    <div className="text-xs text-gray-500 mt-0.5">膠料報廢率(%)</div>
+                  </TableCell>
+                  {days.map((d) => renderCell(d, 'RUBBER_MIXING', calculateRate(getCustomScrapForDate(d, 'RUBBER_MIXING'), getSummaryForDate(d).mixingRubberUsage ?? getSummaryForDate(d).rubberUsage)))}
+                </TableRow>
+
+                {/* RN (Rubber Recycling) */}
+                <TableRow>
+                  <TableCell className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal">
+                    <div className="text-sm">Extrusion rubber usage (kg)</div>
+                    <div className="text-xs text-gray-500 mt-0.5">押出膠料使用重量(kg)</div>
+                  </TableCell>
+                  {days.map((d) => renderCell(d, 'RN', getSummaryForDate(d).extrusionRubberUsage ?? ''))}
+                </TableRow>
+                <TableRow>
+                  <TableCell className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal">
+                    <div className="text-sm">RN generation weight (kg)</div>
+                    <div className="text-xs text-gray-500 mt-0.5">RN產生重量(kg)</div>
+                  </TableCell>
+                  {days.map((d) => renderCell(d, 'RN', getCustomScrapForDate(d, 'RN') ?? ''))}
+                </TableRow>
+                <TableRow className="bg-[#ddebf7]">
+                  <TableCell className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal">
+                    <div className="text-sm">Rubber recovery rate (%)</div>
+                    <div className="text-xs text-gray-500 mt-0.5">膠料回收率(%)</div>
+                  </TableCell>
+                  {days.map((d) => renderCell(d, 'RN', calculateRate(getCustomScrapForDate(d, 'RN'), getSummaryForDate(d).extrusionRubberUsage)))}
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {detailModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="p-4 border-b flex justify-between items-center bg-gray-50">
+              <h2 className="text-lg font-semibold">
+                Scrap Details - {format(detailModal.date, 'PPP')} 
+                <span className="text-muted-foreground ml-2 text-sm">
+                  ({detailModal.type.replace('_', ' & ')})
+                </span>
+              </h2>
+              <Button variant="ghost" size="icon" onClick={() => setDetailModal(null)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="p-4 overflow-auto flex-1">
+              {getFilteredScrapsForModal().length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No scrap records found for this date and material type.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Shift</TableHead>
+                      <TableHead>Section</TableHead>
+                      <TableHead>Material Type</TableHead>
+                      <TableHead>Material Name</TableHead>
+                      <TableHead>Weight (kg)</TableHead>
+                      <TableHead>Reason</TableHead>
+                      <TableHead>Picture</TableHead>
+                      <TableHead>Recorded At</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {getFilteredScrapsForModal().map((scrap: any, i: number) => (
+                      <TableRow key={i}>
+                        <TableCell className="whitespace-nowrap">{scrap.date}</TableCell>
+                        <TableCell>{scrap.shift}</TableCell>
+                        <TableCell>{scrap.section}</TableCell>
+                        <TableCell className="font-medium">{scrap.material}</TableCell>
+                        <TableCell>{scrap.materialName || '-'}</TableCell>
+                        <TableCell>{scrap.weight}</TableCell>
+                        <TableCell>{scrap.reason}</TableCell>
+                        <TableCell>
+                          {scrap.imageUrl ? (
+                            <a href={scrap.imageUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                              View Image
+                            </a>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">No image</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground whitespace-nowrap">{scrap.timestamp || scrap.time || '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
