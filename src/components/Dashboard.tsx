@@ -70,7 +70,7 @@ export function Dashboard() {
   const displayBicScrap = getScrapTotal('BIC');
   const displayPlyScrap = getScrapTotal('PLY');
   const displayRubberScrap = getScrapTotal('Rubber');
-  const displayRnScrap = getScrapTotal('Extrusion Rubber');
+  const displayRnScrap = getScrapTotal('RN') + getScrapTotal('Extrusion Rubber');
 
   const calculateRate = (scrap: number, usage: number) => {
     if (!usage || usage === 0) return null;
@@ -83,6 +83,32 @@ export function Dashboard() {
     const num = Number(val);
     if (num === 0) return '0';
     return num.toFixed(1) + (unit ? ` ${unit}` : '');
+  };
+
+  const formatToIST = (timestamp: string) => {
+    if (!timestamp || timestamp === '-') return '-';
+    try {
+      // Check if it's already an ISO string or a valid date string
+      const dateObj = new Date(timestamp);
+      if (!isNaN(dateObj.getTime())) {
+        return dateObj.toLocaleString('en-IN', { 
+          timeZone: 'Asia/Kolkata',
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        }).replace(/\//g, '-');
+      }
+      
+      // Fallback for old format dd-MM-yyyy HH:mm:ss
+      // We'll just return it as is if it doesn't look like an ISO string
+      return timestamp;
+    } catch (e) {
+      return timestamp;
+    }
   };
 
   return (
@@ -283,7 +309,7 @@ export function Dashboard() {
                         <span className="text-muted-foreground text-sm">No image</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-muted-foreground whitespace-nowrap">{scrap.timestamp || scrap.time || '-'}</TableCell>
+                    <TableCell className="text-muted-foreground whitespace-nowrap">{formatToIST(scrap.timestamp || scrap.time || '-')}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

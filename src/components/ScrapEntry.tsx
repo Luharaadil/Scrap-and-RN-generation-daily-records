@@ -91,7 +91,7 @@ export function ScrapEntry() {
     try {
       await saveScrapDetails({
         date: format(date, 'yyyy-MM-dd'),
-        timestamp: format(new Date(), 'dd-MM-yyyy HH:mm:ss'),
+        timestamp: new Date().toISOString(),
         material: formData.material,
         materialName: formData.materialName,
         weight: formData.weight || 0,
@@ -287,21 +287,21 @@ export function ScrapEntry() {
             </div>
           )}
           
-          <div className="pt-4 flex flex-wrap justify-center gap-4">
+          <div className="pt-4 flex flex-row justify-center gap-2 sm:gap-4">
             <Button 
               type="button" 
               variant="outline" 
               size="square-lg" 
               onClick={() => fileInputRef.current?.click()}
-              className="w-full sm:w-40 h-24"
+              className="flex-1 h-24"
             >
-              <Upload className="h-6 w-6" />
-              <span>Upload Picture</span>
+              <Upload className="h-5 w-5 sm:h-6 sm:w-6" />
+              <span className="text-xs sm:text-sm">Upload Picture</span>
             </Button>
 
-            <Button type="submit" disabled={loading} size="square-lg" className="w-full sm:w-40 h-24">
-              {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />}
-              <span>{loading ? 'Saving...' : 'Save Scrap'}</span>
+            <Button type="submit" disabled={loading} size="square-lg" className="flex-1 h-24">
+              {loading ? <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 animate-spin" /> : <Save className="h-5 w-5 sm:h-6 sm:w-6" />}
+              <span className="text-xs sm:text-sm">{loading ? 'Saving...' : 'Save Scrap'}</span>
             </Button>
           </div>
         </CardContent>

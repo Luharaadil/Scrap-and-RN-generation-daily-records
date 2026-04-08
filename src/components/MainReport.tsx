@@ -171,7 +171,7 @@ export function MainReport() {
       );
     } else if (type === 'RUBBER_MIXING') {
       filtered = dayScraps.filter((s: any) => 
-        s.material === 'Rubber'
+        s.material === 'Rubber' && s.section === 'Mixing'
       );
     } else if (type === 'RN') {
       filtered = dayScraps.filter((s: any) => s.material === 'Extrusion Rubber' || s.material === 'RN');
@@ -272,9 +272,31 @@ export function MainReport() {
         s.material === 'Rubber' && s.section === 'Mixing'
       );
     } else if (detailModal.type === 'RN') {
-      return dayScraps.filter((s: any) => s.material === 'Extrusion Rubber');
+      return dayScraps.filter((s: any) => s.material === 'Extrusion Rubber' || s.material === 'RN');
     }
     return [];
+  };
+
+  const formatToIST = (timestamp: string) => {
+    if (!timestamp || timestamp === '-') return '-';
+    try {
+      const dateObj = new Date(timestamp);
+      if (!isNaN(dateObj.getTime())) {
+        return dateObj.toLocaleString('en-IN', { 
+          timeZone: 'Asia/Kolkata',
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        }).replace(/\//g, '-');
+      }
+      return timestamp;
+    } catch (e) {
+      return timestamp;
+    }
   };
 
   const renderCell = (d: Date, type: 'BIC' | 'PLY_CHAFER' | 'RUBBER_MIXING' | 'RN', value: any, rowId: string) => {
@@ -487,7 +509,7 @@ export function MainReport() {
                             <span className="text-muted-foreground text-sm">No image</span>
                           )}
                         </TableCell>
-                        <TableCell className="text-muted-foreground whitespace-nowrap">{scrap.timestamp || scrap.time || '-'}</TableCell>
+                        <TableCell className="text-muted-foreground whitespace-nowrap">{formatToIST(scrap.timestamp || scrap.time || '-')}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

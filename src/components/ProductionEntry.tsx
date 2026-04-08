@@ -10,6 +10,48 @@ import { Label } from '@/src/components/ui/label';
 import { saveProductionSummary, fetchSummaryAndScraps, getWebAppUrl } from '@/src/lib/api';
 import { cn } from '@/src/lib/utils';
 
+function ProductionRow({ label, name, value, sectionKey, onChange, onSave, loading, isFetching, savingSection }: { 
+  label: string, 
+  name: string, 
+  value: string, 
+  sectionKey: string,
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void,
+  onSave: (sectionKey: string) => void,
+  loading: boolean,
+  isFetching: boolean,
+  savingSection: string | null
+}) {
+  return (
+    <div className="flex flex-col sm:flex-row items-center gap-4 p-4 border rounded-lg bg-gray-50/50">
+      <Button 
+        type="button" 
+        variant="outline" 
+        size="square-lg" 
+        className="w-full sm:w-64 h-24 text-center flex flex-col gap-2 shrink-0"
+        onClick={() => onSave(sectionKey)}
+        disabled={loading || isFetching || !!savingSection}
+      >
+        {savingSection === sectionKey ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />}
+        <span className="text-sm font-bold whitespace-normal leading-tight">{label}</span>
+      </Button>
+      <div className="flex-1 w-full">
+        <Label htmlFor={name} className="mb-2 block text-xs font-bold uppercase text-gray-500">Enter Weight (kg)</Label>
+        <Input 
+          id={name} 
+          name={name} 
+          type="number" 
+          step="0.01" 
+          value={value} 
+          onChange={onChange} 
+          placeholder="0"
+          className="h-16 text-xl font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          disabled={isFetching || !!savingSection}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function ProductionEntry() {
   const [date, setDate] = useState<Date>(new Date());
   const [loading, setLoading] = useState(false);
@@ -63,7 +105,7 @@ export function ProductionEntry() {
     try {
       await saveProductionSummary({
         date: format(date, 'yyyy-MM-dd'),
-        timestamp: format(new Date(), 'dd-MM-yyyy HH:mm:ss'),
+        timestamp: new Date().toISOString(),
         bicUsage: formData.bicUsage || 0,
         bicScrap: 0,
         plyUsage: formData.plyUsage || 0,
@@ -83,36 +125,6 @@ export function ProductionEntry() {
       setSavingSection(null);
     }
   };
-
-  const ProductionRow = ({ label, name, value, sectionKey }: { label: string, name: string, value: string, sectionKey: string }) => (
-    <div className="flex flex-col sm:flex-row items-center gap-4 p-4 border rounded-lg bg-gray-50/50">
-      <Button 
-        type="button" 
-        variant="outline" 
-        size="square-lg" 
-        className="w-full sm:w-64 h-24 text-center flex flex-col gap-2 shrink-0"
-        onClick={() => handleSaveSection(sectionKey)}
-        disabled={loading || isFetching || !!savingSection}
-      >
-        {savingSection === sectionKey ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />}
-        <span className="text-sm font-bold whitespace-normal leading-tight">{label}</span>
-      </Button>
-      <div className="flex-1 w-full">
-        <Label htmlFor={name} className="mb-2 block text-xs font-bold uppercase text-gray-500">Enter Weight (kg)</Label>
-        <Input 
-          id={name} 
-          name={name} 
-          type="number" 
-          step="0.01" 
-          value={value} 
-          onChange={handleChange} 
-          placeholder="0"
-          className="h-16 text-xl font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-          disabled={isFetching || !!savingSection}
-        />
-      </div>
-    </div>
-  );
 
   return (
     <Card className="w-full">
@@ -152,24 +164,44 @@ export function ProductionEntry() {
             name="plyUsage" 
             value={formData.plyUsage} 
             sectionKey="plyUsage"
+            onChange={handleChange}
+            onSave={handleSaveSection}
+            loading={loading}
+            isFetching={isFetching}
+            savingSection={savingSection}
           />
           <ProductionRow 
             label="Cutting BIC (kg)" 
             name="bicUsage" 
             value={formData.bicUsage} 
             sectionKey="bicUsage"
+            onChange={handleChange}
+            onSave={handleSaveSection}
+            loading={loading}
+            isFetching={isFetching}
+            savingSection={savingSection}
           />
           <ProductionRow 
             label="Mixing Rubber (kg)" 
             name="mixingRubberUsage" 
             value={formData.mixingRubberUsage} 
             sectionKey="mixingRubberUsage"
+            onChange={handleChange}
+            onSave={handleSaveSection}
+            loading={loading}
+            isFetching={isFetching}
+            savingSection={savingSection}
           />
           <ProductionRow 
             label="Extrusion Rubber (kg)" 
             name="extrusionRubberUsage" 
             value={formData.extrusionRubberUsage} 
             sectionKey="extrusionRubberUsage"
+            onChange={handleChange}
+            onSave={handleSaveSection}
+            loading={loading}
+            isFetching={isFetching}
+            savingSection={savingSection}
           />
         </div>
 

@@ -22,7 +22,7 @@ function AppContent() {
             sidebarOpen ? "w-72" : "w-0 -translate-x-full md:w-16 md:translate-x-0"
           )}
         >
-          <div className="p-4 border-b flex items-center justify-between overflow-hidden">
+          <div className={cn("p-4 border-b flex items-center overflow-hidden", sidebarOpen ? "justify-between" : "justify-center")}>
             <h1 className={cn("font-bold tracking-tight text-gray-900 whitespace-nowrap transition-opacity duration-200", sidebarOpen ? "opacity-100 text-xl" : "opacity-0 text-[0px]")}>
               MRI Tracker
             </h1>
