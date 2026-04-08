@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns';
-import { Calendar as CalendarIcon, Loader2, RefreshCw, Copy, Image as ImageIcon, Check, X } from 'lucide-react';
+import { Calendar as CalendarIcon, Loader2, RefreshCw, Copy, Image as ImageIcon, Check, X, Type, Plus, Minus } from 'lucide-react';
 import { toBlob } from 'html-to-image';
 import { Calendar } from '@/src/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/src/components/ui/popover';
@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { fetchRangeData, getWebAppUrl } from '@/src/lib/api';
 import { cn } from '@/src/lib/utils';
 import { DateRange } from 'react-day-picker';
+import { useSidebar } from '@/src/lib/SidebarContext';
 
 export function MainReport() {
   const [date, setDate] = useState<DateRange | undefined>({
@@ -22,7 +23,17 @@ export function MainReport() {
   const [copiedText, setCopiedText] = useState(false);
   const [copiedImage, setCopiedImage] = useState(false);
   const [detailModal, setDetailModal] = useState<{date: Date, type: 'BIC' | 'PLY_CHAFER' | 'RUBBER' | 'RN'} | null>(null);
+  const [isEditingFont, setIsEditingFont] = useState(false);
+  const [rowFontSizes, setRowFontSizes] = useState<Record<string, number>>({});
   const tableRef = useRef<HTMLDivElement>(null);
+  const { setControls, sidebarOpen } = useSidebar();
+
+  const adjustFontSize = (rowId: string, delta: number) => {
+    setRowFontSizes(prev => ({
+      ...prev,
+      [rowId]: Math.max(8, (prev[rowId] || 14) + delta)
+    }));
+  };
 
   const loadData = async () => {
     if (!getWebAppUrl() || !date?.from || !date?.to) return;
@@ -33,7 +44,6 @@ export function MainReport() {
       const startDate = format(date.from, 'yyyy-MM-dd');
       const endDate = format(date.to, 'yyyy-MM-dd');
       const result = await fetchRangeData(startDate, endDate);
-      console.log('MainReport data:', result);
       setData(result);
     } catch (err: any) {
       setError(err.message || 'Failed to load data');
@@ -52,22 +62,104 @@ export function MainReport() {
     return () => { active = false; };
   }, [date]);
 
+  useEffect(() => {
+    setControls(
+      <div className="space-y-4">
+        <div className="space-y-2">
+          {sidebarOpen && <label className="text-xs font-bold text-gray-500">Date Range</label>}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                id="date"
+                variant={"outline"}
+                className={cn(
+                  "w-full justify-start text-left font-normal",
+                  !date && "text-muted-foreground",
+                  !sidebarOpen && "justify-center px-0"
+                )}
+                title={date?.from ? `${format(date.from, "LLL dd, y")} - ${date.to ? format(date.to, "LLL dd, y") : ""}` : "Pick a date range"}
+              >
+                <CalendarIcon className={cn("h-4 w-4", sidebarOpen && "mr-2")} />
+                {sidebarOpen && (
+                  date?.from ? (
+                    date.to ? (
+                      <>
+                        {format(date.from, "LLL dd, y")} -{" "}
+                        {format(date.to, "LLL dd, y")}
+                      </>
+                    ) : (
+                      format(date.from, "LLL dd, y")
+                    )
+                  ) : (
+                    <span>Pick a date range</span>
+                  )
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                initialFocus
+                mode="range"
+                defaultMonth={date?.from}
+                selected={date}
+                onSelect={setDate}
+                numberOfMonths={1}
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        <div className="space-y-2">
+          {sidebarOpen && <label className="text-xs font-bold text-gray-500">Actions</label>}
+          <div className={cn("grid gap-2", sidebarOpen ? "grid-cols-2" : "grid-cols-1")}>
+            <Button variant="outline" size={sidebarOpen ? "square-lg" : "icon"} onClick={copyValuesOnly} title="Copy values only (for Excel)" className={cn(!sidebarOpen && "size-20 flex-col gap-1 text-[8px] uppercase font-bold")}>
+              {copiedText ? <Check className={cn(sidebarOpen ? "h-6 w-6" : "h-5 w-5", "text-green-600")} /> : <Copy className={sidebarOpen ? "h-6 w-6" : "h-5 w-5"} />}
+              {!sidebarOpen && <span>Values</span>}
+              {sidebarOpen && <span>Values</span>}
+            </Button>
+            <Button variant="outline" size={sidebarOpen ? "square-lg" : "icon"} onClick={copyAsPicture} title="Copy table as picture" className={cn(!sidebarOpen && "size-20 flex-col gap-1 text-[8px] uppercase font-bold")}>
+              {copiedImage ? <Check className={cn(sidebarOpen ? "h-6 w-6" : "h-5 w-5", "text-green-600")} /> : <ImageIcon className={sidebarOpen ? "h-6 w-6" : "h-5 w-5"} />}
+              {!sidebarOpen && <span>Picture</span>}
+              {sidebarOpen && <span>Picture</span>}
+            </Button>
+            <Button variant="outline" size={sidebarOpen ? "square-lg" : "icon"} onClick={loadData} disabled={loading} className={cn(sidebarOpen ? "col-span-2 w-full h-16" : "size-20 flex-col gap-1 text-[8px] uppercase font-bold")}>
+              <RefreshCw className={cn(sidebarOpen ? "h-6 w-6" : "h-5 w-5", loading && "animate-spin")} />
+              {!sidebarOpen && <span>Reload</span>}
+              {sidebarOpen && <span>Reload Data</span>}
+            </Button>
+            <Button 
+              variant={isEditingFont ? "default" : "outline"} 
+              size={sidebarOpen ? "square-lg" : "icon"} 
+              onClick={() => setIsEditingFont(!isEditingFont)} 
+              title="Edit row font sizes" 
+              className={cn(sidebarOpen ? "col-span-2 w-full h-16" : "size-20 flex-col gap-1 text-[8px] uppercase font-bold")}
+            >
+              <Type className={sidebarOpen ? "h-6 w-6" : "h-5 w-5"} />
+              {!sidebarOpen && <span>Font</span>}
+              {sidebarOpen && <span>Edit Font</span>}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+    return () => setControls(null);
+  }, [date, loading, copiedText, copiedImage, sidebarOpen, isEditingFont]);
+
   const days = date?.from && date?.to 
     ? eachDayOfInterval({ start: date.from, end: date.to }) 
     : (date?.from ? [date.from] : []);
 
   const getSummaryForDate = (d: Date) => {
     const formattedDate = format(d, 'yyyy-MM-dd');
-    const summary = data?.summaries?.find((s: any) => s.date === formattedDate) || {};
-    return {
-      ...summary,
-      extrusionRubberUsage: summary.extrusionRubberUsage ?? 0
-    };
+    const summary = data?.summaries?.find((s: any) => s.date === formattedDate);
+    return summary || null;
   };
 
   const getCustomScrapForDate = (d: Date, type: 'BIC' | 'PLY_CHAFER' | 'RUBBER_MIXING' | 'RN') => {
     const formattedDate = format(d, 'yyyy-MM-dd');
     const dayScraps = data?.scraps?.filter((s: any) => s.date === formattedDate) || [];
+    
+    const hasSummary = data?.summaries?.some((s: any) => s.date === formattedDate);
     
     let filtered = [];
     if (type === 'BIC') {
@@ -82,17 +174,23 @@ export function MainReport() {
         s.material === 'Rubber'
       );
     } else if (type === 'RN') {
-      filtered = dayScraps.filter((s: any) => s.material === 'Extrusion Rubber');
+      filtered = dayScraps.filter((s: any) => s.material === 'Extrusion Rubber' || s.material === 'RN');
     }
     
-    if (filtered.length === 0) return null;
+    if (filtered.length === 0) {
+      return hasSummary ? 0 : null;
+    }
     return filtered.reduce((sum: number, s: any) => sum + Number(s.weight || 0), 0);
   };
 
   const calculateRate = (scrap: number | null, usage: number | null) => {
-    if (usage === null || usage === undefined || usage === 0) return '';
-    if (scrap === null || scrap === undefined) return '';
-    return ((Number(scrap) / Number(usage)) * 100).toFixed(2) + '%';
+    if (usage === null || usage === undefined) return null;
+    if (scrap === null || scrap === undefined) return null;
+    const s = Number(scrap);
+    const u = Number(usage);
+    if (s === 0) return 0;
+    if (u === 0) return 0;
+    return ((s / u) * 100).toFixed(3) + '%';
   };
 
   const copyValuesOnly = () => {
@@ -100,20 +198,20 @@ export function MainReport() {
     
     const rowsData = [
       // BIC
-      days.map(d => getSummaryForDate(d).bicUsage || ''),
-      days.map(d => getCustomScrapForDate(d, 'BIC') || ''),
+      days.map(d => getSummaryForDate(d).bicUsage || '0'),
+      days.map(d => getCustomScrapForDate(d, 'BIC') || '0'),
       days.map(d => calculateRate(getCustomScrapForDate(d, 'BIC'), getSummaryForDate(d).bicUsage)),
       // PLY + Chafer
-      days.map(d => getSummaryForDate(d).plyUsage || ''),
-      days.map(d => getCustomScrapForDate(d, 'PLY_CHAFER') || ''),
+      days.map(d => getSummaryForDate(d).plyUsage || '0'),
+      days.map(d => getCustomScrapForDate(d, 'PLY_CHAFER') || '0'),
       days.map(d => calculateRate(getCustomScrapForDate(d, 'PLY_CHAFER'), getSummaryForDate(d).plyUsage)),
       // Rubber Mixing
-      days.map(d => getSummaryForDate(d).mixingRubberUsage || getSummaryForDate(d).rubberUsage || ''),
-      days.map(d => getCustomScrapForDate(d, 'RUBBER_MIXING') || ''),
+      days.map(d => getSummaryForDate(d).mixingRubberUsage || getSummaryForDate(d).rubberUsage || '0'),
+      days.map(d => getCustomScrapForDate(d, 'RUBBER_MIXING') || '0'),
       days.map(d => calculateRate(getCustomScrapForDate(d, 'RUBBER_MIXING'), getSummaryForDate(d).mixingRubberUsage || getSummaryForDate(d).rubberUsage)),
       // RN
-      days.map(d => getSummaryForDate(d).mixingRubberUsage || getSummaryForDate(d).rubberUsage || ''),
-      days.map(d => getCustomScrapForDate(d, 'RN') || ''),
+      days.map(d => getSummaryForDate(d).mixingRubberUsage || getSummaryForDate(d).rubberUsage || '0'),
+      days.map(d => getCustomScrapForDate(d, 'RN') || '0'),
       days.map(d => calculateRate(getCustomScrapForDate(d, 'RN'), getSummaryForDate(d).mixingRubberUsage || getSummaryForDate(d).rubberUsage)),
     ];
 
@@ -179,74 +277,54 @@ export function MainReport() {
     return [];
   };
 
-  const renderCell = (d: Date, type: 'BIC' | 'PLY_CHAFER' | 'RUBBER_MIXING' | 'RN', value: any) => (
+  const renderCell = (d: Date, type: 'BIC' | 'PLY_CHAFER' | 'RUBBER_MIXING' | 'RN', value: any, rowId: string) => {
+    let displayValue: React.ReactNode = '';
+    
+    if (value === null || value === undefined || value === '') {
+      displayValue = '';
+    } else if (typeof value === 'number') {
+      displayValue = value === 0 ? '0' : value.toFixed(1);
+    } else if (typeof value === 'string') {
+      if (value === '0' || value === '0%' || value === '0.000%') {
+        displayValue = '0';
+      } else {
+        displayValue = value;
+      }
+    }
+    
+    return (
+      <TableCell 
+        key={d.toISOString()} 
+        className="border border-gray-300 text-center cursor-pointer hover:bg-black/5 transition-colors"
+        style={{ fontSize: rowFontSizes[rowId] ? `${rowFontSizes[rowId]}px` : undefined }}
+        onDoubleClick={() => setDetailModal({ date: d, type })}
+        title="Double click to view scrap details"
+      >
+        {displayValue}
+      </TableCell>
+    );
+  };
+
+  const RowHeader = ({ title, subtitle, rowId }: { title: string, subtitle: string, rowId: string }) => (
     <TableCell 
-      key={d.toISOString()} 
-      className="border border-gray-300 text-center cursor-pointer hover:bg-black/5 transition-colors"
-      onDoubleClick={() => setDetailModal({ date: d, type })}
-      title="Double click to view scrap details"
+      className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal relative group"
+      style={{ fontSize: rowFontSizes[rowId] ? `${rowFontSizes[rowId]}px` : undefined }}
     >
-      {value === null || value === undefined || value === '' || Number(value) === 0 ? '' : value}
+      <div className="text-sm" style={{ fontSize: 'inherit' }}>{title}</div>
+      <div className="text-xs text-gray-500 mt-0.5" style={{ fontSize: rowFontSizes[rowId] ? `${rowFontSizes[rowId] * 0.8}px` : undefined }}>{subtitle}</div>
+      
+      {isEditingFont && (
+        <div className="absolute right-1 top-1/2 -translate-y-1/2 flex flex-col gap-1 bg-white/90 backdrop-blur-sm p-1 rounded border shadow-sm z-10">
+          <button onClick={() => adjustFontSize(rowId, 1)} className="p-0.5 hover:bg-gray-100 rounded text-primary"><Plus className="h-3 w-3" /></button>
+          <span className="text-[10px] text-center font-bold">{rowFontSizes[rowId] || 14}</span>
+          <button onClick={() => adjustFontSize(rowId, -1)} className="p-0.5 hover:bg-gray-100 rounded text-primary"><Minus className="h-3 w-3" /></button>
+        </div>
+      )}
     </TableCell>
   );
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-        <div className="flex flex-wrap gap-3 items-center">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                id="date"
-                variant={"outline"}
-                className={cn(
-                  "w-[300px] justify-start text-left font-normal",
-                  !date && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {date?.from ? (
-                  date.to ? (
-                    <>
-                      {format(date.from, "LLL dd, y")} -{" "}
-                      {format(date.to, "LLL dd, y")}
-                    </>
-                  ) : (
-                    format(date.from, "LLL dd, y")
-                  )
-                ) : (
-                  <span>Pick a date range</span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                initialFocus
-                mode="range"
-                defaultMonth={date?.from}
-                selected={date}
-                onSelect={setDate}
-                numberOfMonths={2}
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={copyValuesOnly} title="Copy values only (for Excel)">
-            {copiedText ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <Copy className="h-4 w-4 mr-2" />}
-            Copy Values
-          </Button>
-          <Button variant="outline" size="sm" onClick={copyAsPicture} title="Copy table as picture">
-            {copiedImage ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <ImageIcon className="h-4 w-4 mr-2" />}
-            Copy Picture
-          </Button>
-          <Button variant="outline" size="icon" onClick={loadData} disabled={loading}>
-            <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
-          </Button>
-        </div>
-      </div>
-
       {error && (
         <div className="text-red-500 text-sm font-medium">{error}</div>
       )}
@@ -273,94 +351,82 @@ export function MainReport() {
               </TableHeader>
               <TableBody>
                 <TableRow>
-                  <TableCell className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal">
-                    <div className="text-sm">BIC usage weight (kg)</div>
-                    <div className="text-xs text-gray-500 mt-0.5">鋼絲使用重量(kg)</div>
-                  </TableCell>
-                  {days.map((d) => renderCell(d, 'BIC', getSummaryForDate(d).bicUsage ?? ''))}
+                  <RowHeader title="BIC usage weight (kg)" subtitle="鋼絲使用重量(kg)" rowId="bic_usage" />
+                  {days.map((d) => {
+                    const summary = getSummaryForDate(d);
+                    return renderCell(d, 'BIC', summary ? (summary.bicUsage ?? 0) : null, 'bic_usage');
+                  })}
                 </TableRow>
                 <TableRow>
-                  <TableCell className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal">
-                    <div className="text-sm">BIC scrapping weight (kg)</div>
-                    <div className="text-xs text-gray-500 mt-0.5">鋼絲報廢公斤數(kg)</div>
-                  </TableCell>
-                  {days.map((d) => renderCell(d, 'BIC', getCustomScrapForDate(d, 'BIC') ?? ''))}
+                  <RowHeader title="BIC scrapping weight (kg)" subtitle="鋼絲報廢公斤數(kg)" rowId="bic_scrap" />
+                  {days.map((d) => renderCell(d, 'BIC', getCustomScrapForDate(d, 'BIC'), 'bic_scrap'))}
                 </TableRow>
                 <TableRow className="bg-[#e2f0d9]">
-                  <TableCell className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal">
-                    <div className="text-sm">BIC scrap rate (%)</div>
-                    <div className="text-xs text-gray-500 mt-0.5">鋼絲報廢率(%)</div>
-                  </TableCell>
-                  {days.map((d) => renderCell(d, 'BIC', calculateRate(getCustomScrapForDate(d, 'BIC'), getSummaryForDate(d).bicUsage)))}
+                  <RowHeader title="BIC scrap rate (%)" subtitle="鋼絲報廢率(%)" rowId="bic_rate" />
+                  {days.map((d) => {
+                    const summary = getSummaryForDate(d);
+                    return renderCell(d, 'BIC', calculateRate(getCustomScrapForDate(d, 'BIC'), summary ? (summary.bicUsage ?? 0) : null), 'bic_rate');
+                  })}
                 </TableRow>
 
                 {/* PLY + Chafer */}
                 <TableRow>
-                  <TableCell className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal">
-                    <div className="text-sm">PLY & Chafer usage weight (kg)</div>
-                    <div className="text-xs text-gray-500 mt-0.5">簾紗及防擦布使用重量(kg)</div>
-                  </TableCell>
-                  {days.map((d) => renderCell(d, 'PLY_CHAFER', getSummaryForDate(d).plyUsage ?? ''))}
+                  <RowHeader title="PLY & Chafer usage weight (kg)" subtitle="簾紗及防擦布使用重量(kg)" rowId="ply_usage" />
+                  {days.map((d) => {
+                    const summary = getSummaryForDate(d);
+                    return renderCell(d, 'PLY_CHAFER', summary ? (summary.plyUsage ?? 0) : null, 'ply_usage');
+                  })}
                 </TableRow>
                 <TableRow>
-                  <TableCell className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal">
-                    <div className="text-sm">PLY & Chafer scrap weight (kg)</div>
-                    <div className="text-xs text-gray-500 mt-0.5">簾紗及防擦布報廢公斤數(kg)</div>
-                  </TableCell>
-                  {days.map((d) => renderCell(d, 'PLY_CHAFER', getCustomScrapForDate(d, 'PLY_CHAFER') ?? ''))}
+                  <RowHeader title="PLY & Chafer scrap weight (kg)" subtitle="簾紗及防擦布報廢公斤數(kg)" rowId="ply_scrap" />
+                  {days.map((d) => renderCell(d, 'PLY_CHAFER', getCustomScrapForDate(d, 'PLY_CHAFER'), 'ply_scrap'))}
                 </TableRow>
                 <TableRow className="bg-[#fce4d6]">
-                  <TableCell className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal">
-                    <div className="text-sm">PLY & Chafer scrap rate (%)</div>
-                    <div className="text-xs text-gray-500 mt-0.5">簾紗及防擦布報廢率(%)</div>
-                  </TableCell>
-                  {days.map((d) => renderCell(d, 'PLY_CHAFER', calculateRate(getCustomScrapForDate(d, 'PLY_CHAFER'), getSummaryForDate(d).plyUsage)))}
+                  <RowHeader title="PLY & Chafer scrap rate (%)" subtitle="簾紗及防擦布報廢率(%)" rowId="ply_rate" />
+                  {days.map((d) => {
+                    const summary = getSummaryForDate(d);
+                    return renderCell(d, 'PLY_CHAFER', calculateRate(getCustomScrapForDate(d, 'PLY_CHAFER'), summary ? (summary.plyUsage ?? 0) : null), 'ply_rate');
+                  })}
                 </TableRow>
 
                 {/* Rubber (Mixing) */}
                 <TableRow>
-                  <TableCell className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal">
-                    <div className="text-sm">Rubber usage weight (Mixing) (kg)</div>
-                    <div className="text-xs text-gray-500 mt-0.5">膠料使用重量(kg)</div>
-                  </TableCell>
-                  {days.map((d) => renderCell(d, 'RUBBER_MIXING', getSummaryForDate(d).mixingRubberUsage ?? getSummaryForDate(d).rubberUsage ?? ''))}
+                  <RowHeader title="Rubber usage weight (Mixing) (kg)" subtitle="膠料使用重量(kg)" rowId="rubber_usage" />
+                  {days.map((d) => {
+                    const summary = getSummaryForDate(d);
+                    return renderCell(d, 'RUBBER_MIXING', summary ? (summary.mixingRubberUsage ?? summary.rubberUsage ?? 0) : null, 'rubber_usage');
+                  })}
                 </TableRow>
                 <TableRow>
-                  <TableCell className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal">
-                    <div className="text-sm">Rubber scrap weight (Mixing) (kg)</div>
-                    <div className="text-xs text-gray-500 mt-0.5">膠料報廢公斤數(kg)</div>
-                  </TableCell>
-                  {days.map((d) => renderCell(d, 'RUBBER_MIXING', getCustomScrapForDate(d, 'RUBBER_MIXING') ?? ''))}
+                  <RowHeader title="Rubber scrap weight (Mixing) (kg)" subtitle="膠料報廢公斤數(kg)" rowId="rubber_scrap" />
+                  {days.map((d) => renderCell(d, 'RUBBER_MIXING', getCustomScrapForDate(d, 'RUBBER_MIXING'), 'rubber_scrap'))}
                 </TableRow>
                 <TableRow className="bg-[#ddebf7]">
-                  <TableCell className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal">
-                    <div className="text-sm">Rubber scrap rate (Mixing) (%)</div>
-                    <div className="text-xs text-gray-500 mt-0.5">膠料報廢率(%)</div>
-                  </TableCell>
-                  {days.map((d) => renderCell(d, 'RUBBER_MIXING', calculateRate(getCustomScrapForDate(d, 'RUBBER_MIXING'), getSummaryForDate(d).mixingRubberUsage ?? getSummaryForDate(d).rubberUsage)))}
+                  <RowHeader title="Rubber scrap rate (Mixing) (%)" subtitle="膠料報廢率(%)" rowId="rubber_rate" />
+                  {days.map((d) => {
+                    const summary = getSummaryForDate(d);
+                    return renderCell(d, 'RUBBER_MIXING', calculateRate(getCustomScrapForDate(d, 'RUBBER_MIXING'), summary ? (summary.mixingRubberUsage ?? summary.rubberUsage ?? 0) : null), 'rubber_rate');
+                  })}
                 </TableRow>
 
                 {/* RN (Rubber Recycling) */}
                 <TableRow>
-                  <TableCell className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal">
-                    <div className="text-sm">Extrusion rubber usage (kg)</div>
-                    <div className="text-xs text-gray-500 mt-0.5">押出膠料使用重量(kg)</div>
-                  </TableCell>
-                  {days.map((d) => renderCell(d, 'RN', getSummaryForDate(d).extrusionRubberUsage ?? ''))}
+                  <RowHeader title="Extrusion rubber usage (kg)" subtitle="押出膠料使用重量(kg)" rowId="rn_usage" />
+                  {days.map((d) => {
+                    const summary = getSummaryForDate(d);
+                    return renderCell(d, 'RN', summary ? (summary.extrusionRubberUsage ?? 0) : null, 'rn_usage');
+                  })}
                 </TableRow>
                 <TableRow>
-                  <TableCell className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal">
-                    <div className="text-sm">RN generation weight (kg)</div>
-                    <div className="text-xs text-gray-500 mt-0.5">RN產生重量(kg)</div>
-                  </TableCell>
-                  {days.map((d) => renderCell(d, 'RN', getCustomScrapForDate(d, 'RN') ?? ''))}
+                  <RowHeader title="RN generation weight (kg)" subtitle="RN產生重量(kg)" rowId="rn_scrap" />
+                  {days.map((d) => renderCell(d, 'RN', getCustomScrapForDate(d, 'RN'), 'rn_scrap'))}
                 </TableRow>
                 <TableRow className="bg-[#ddebf7]">
-                  <TableCell className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal">
-                    <div className="text-sm">Rubber recovery rate (%)</div>
-                    <div className="text-xs text-gray-500 mt-0.5">膠料回收率(%)</div>
-                  </TableCell>
-                  {days.map((d) => renderCell(d, 'RN', calculateRate(getCustomScrapForDate(d, 'RN'), getSummaryForDate(d).extrusionRubberUsage)))}
+                  <RowHeader title="Rubber recovery rate (%)" subtitle="膠料回收率(%)" rowId="rn_rate" />
+                  {days.map((d) => {
+                    const summary = getSummaryForDate(d);
+                    return renderCell(d, 'RN', calculateRate(getCustomScrapForDate(d, 'RN'), summary ? (summary.extrusionRubberUsage ?? 0) : null), 'rn_rate');
+                  })}
                 </TableRow>
               </TableBody>
             </Table>
@@ -410,7 +476,7 @@ export function MainReport() {
                         <TableCell>{scrap.section}</TableCell>
                         <TableCell className="font-medium">{scrap.material}</TableCell>
                         <TableCell>{scrap.materialName || '-'}</TableCell>
-                        <TableCell>{scrap.weight}</TableCell>
+                        <TableCell>{typeof scrap.weight === 'number' ? (scrap.weight === 0 ? '0' : scrap.weight.toFixed(1)) : (scrap.weight || '0')}</TableCell>
                         <TableCell>{scrap.reason}</TableCell>
                         <TableCell>
                           {scrap.imageUrl ? (

@@ -1,6 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Loader2, Upload, X } from 'lucide-react';
+import { Calendar as CalendarIcon, Loader2, Upload, X, Save } from 'lucide-react';
 import { Calendar } from '@/src/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/src/components/ui/popover';
 import { Button } from '@/src/components/ui/button';
@@ -113,40 +113,40 @@ export function ScrapEntry() {
   };
 
   return (
-    <Card className="max-w-2xl mx-auto">
+    <Card className="w-full">
       <CardHeader>
         <CardTitle>Scrap Entry</CardTitle>
         <CardDescription>Record scrap details and upload a picture.</CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !date && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {date ? format(date, "PPP") : <span>Pick a date</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={date}
-                    onSelect={(d) => d && setDate(d)}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
+          <div className="space-y-2">
+            <Label>Date</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !date && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {date ? format(date, "PPP") : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={date}
+                  onSelect={(d) => d && setDate(d)}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label>Material Type</Label>
               <Select value={formData.material} onValueChange={(v) => handleSelectChange('material', v)}>
@@ -165,9 +165,7 @@ export function ScrapEntry() {
                 </SelectContent>
               </Select>
             </div>
-          </div>
 
-          {formData.material && (
             <div className="space-y-2">
               <Label htmlFor="materialName">Material Name / Code</Label>
               <Input 
@@ -176,12 +174,10 @@ export function ScrapEntry() {
                 required
                 value={formData.materialName} 
                 onChange={handleChange} 
-                placeholder="Enter specific material name or code"
+                placeholder="Enter name or code"
               />
             </div>
-          )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Shift</Label>
               <Select value={formData.shift} onValueChange={(v) => handleSelectChange('shift', v)}>
@@ -229,7 +225,7 @@ export function ScrapEntry() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label htmlFor="weight">Scrap Weight (kg)</Label>
               <Input 
@@ -240,7 +236,7 @@ export function ScrapEntry() {
                 required
                 value={formData.weight} 
                 onChange={handleChange} 
-                placeholder="0.00"
+                placeholder="0"
               />
             </div>
             <div className="space-y-2">
@@ -251,18 +247,14 @@ export function ScrapEntry() {
                 required
                 value={formData.reason} 
                 onChange={handleChange} 
-                placeholder="e.g., Machine error, Quality issue"
+                placeholder="e.g., Machine error"
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label>Scrap Picture</Label>
+            <Label>Scrap Picture Preview</Label>
             <div className="flex items-center gap-4">
-              <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
-                <Upload className="mr-2 h-4 w-4" />
-                Upload Image
-              </Button>
               <input 
                 type="file" 
                 ref={fileInputRef} 
@@ -270,9 +262,9 @@ export function ScrapEntry() {
                 accept="image/*" 
                 className="hidden" 
               />
-              {imagePreview && (
+              {imagePreview ? (
                 <div className="relative">
-                  <img src={imagePreview} alt="Preview" className="h-16 w-16 object-cover rounded-md border" />
+                  <img src={imagePreview} alt="Preview" className="size-20 object-cover rounded-md border" />
                   <button 
                     type="button" 
                     onClick={clearImage}
@@ -281,22 +273,38 @@ export function ScrapEntry() {
                     <X className="h-3 w-3" />
                   </button>
                 </div>
+              ) : (
+                <div className="size-20 border-2 border-dashed border-gray-200 rounded-md flex items-center justify-center text-gray-400 text-xs text-center p-2">
+                  No image selected
+                </div>
               )}
             </div>
           </div>
 
           {message && (
-            <div className={cn("text-sm font-medium", message.includes('Error') ? "text-red-500" : "text-green-600")}>
+            <div className={cn("text-sm font-medium p-3 rounded-md", message.includes('Error') ? "bg-red-50 text-red-500" : "bg-green-50 text-green-600")}>
               {message}
             </div>
           )}
+          
+          <div className="pt-4 flex flex-wrap justify-center gap-4">
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="square-lg" 
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full sm:w-40 h-24"
+            >
+              <Upload className="h-6 w-6" />
+              <span>Upload Picture</span>
+            </Button>
+
+            <Button type="submit" disabled={loading} size="square-lg" className="w-full sm:w-40 h-24">
+              {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />}
+              <span>{loading ? 'Saving...' : 'Save Scrap'}</span>
+            </Button>
+          </div>
         </CardContent>
-        <CardFooter>
-          <Button type="submit" disabled={loading} className="w-full">
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Save Scrap Record
-          </Button>
-        </CardFooter>
       </form>
     </Card>
   );

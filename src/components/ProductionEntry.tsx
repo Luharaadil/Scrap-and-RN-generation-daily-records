@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Loader2 } from 'lucide-react';
+import { Calendar as CalendarIcon, Loader2, Save } from 'lucide-react';
 import { Calendar } from '@/src/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/src/components/ui/popover';
 import { Button } from '@/src/components/ui/button';
@@ -22,6 +22,7 @@ export function ProductionEntry() {
     extrusionRubberUsage: '',
     mixingRubberUsage: ''
   });
+  const [savingSection, setSavingSection] = useState<string | null>(null);
 
   useEffect(() => {
     const loadExistingData = async () => {
@@ -33,13 +34,13 @@ export function ProductionEntry() {
         const result = await fetchSummaryAndScraps(formattedDate);
         if (result && result.summary) {
           setFormData({
-            bicUsage: result.summary.bicUsage || '',
-            plyUsage: result.summary.plyUsage || '',
-            extrusionRubberUsage: result.summary.extrusionRubberUsage || result.summary.chaferUsage || '',
-            mixingRubberUsage: result.summary.mixingRubberUsage || result.summary.rubberUsage || ''
+            bicUsage: result.summary.bicUsage || '0',
+            plyUsage: result.summary.plyUsage || '0',
+            extrusionRubberUsage: result.summary.extrusionRubberUsage || result.summary.chaferUsage || '0',
+            mixingRubberUsage: result.summary.mixingRubberUsage || result.summary.rubberUsage || '0'
           });
         } else {
-          setFormData({ bicUsage: '', plyUsage: '', extrusionRubberUsage: '', mixingRubberUsage: '' });
+          setFormData({ bicUsage: '0', plyUsage: '0', extrusionRubberUsage: '0', mixingRubberUsage: '0' });
         }
       } catch (err: any) {
         console.error("Failed to load existing data:", err);
@@ -55,9 +56,8 @@ export function ProductionEntry() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  const handleSaveSection = async (sectionKey: string) => {
+    setSavingSection(sectionKey);
     setMessage('');
     
     try {
@@ -65,128 +65,131 @@ export function ProductionEntry() {
         date: format(date, 'yyyy-MM-dd'),
         timestamp: format(new Date(), 'dd-MM-yyyy HH:mm:ss'),
         bicUsage: formData.bicUsage || 0,
-        bicScrap: 0, // Scrap is updated via Scrap Entry
+        bicScrap: 0,
         plyUsage: formData.plyUsage || 0,
         plyScrap: 0,
-        rubberUsage: formData.mixingRubberUsage || 0, // Save mixing rubber to the existing rubberUsage column
+        rubberUsage: formData.mixingRubberUsage || 0,
         rubberScrap: 0,
         rnScrap: 0,
-        chaferUsage: formData.extrusionRubberUsage || 0, // Save extrusion rubber to the existing chaferUsage column
+        chaferUsage: formData.extrusionRubberUsage || 0,
         chaferScrap: 0,
         extrusionRubberUsage: formData.extrusionRubberUsage || 0,
-        mixingRubberUsage: formData.mixingRubberUsage || 0 // Keep for compatibility if backend is updated
+        mixingRubberUsage: formData.mixingRubberUsage || 0
       });
-      setMessage('Production data saved successfully!');
-      setFormData({ bicUsage: '', plyUsage: '', extrusionRubberUsage: '', mixingRubberUsage: '' });
+      setMessage(`${sectionKey.replace('Usage', '')} data saved successfully!`);
     } catch (err: any) {
       setMessage(`Error: ${err.message}`);
     } finally {
-      setLoading(false);
+      setSavingSection(null);
     }
   };
 
+  const ProductionRow = ({ label, name, value, sectionKey }: { label: string, name: string, value: string, sectionKey: string }) => (
+    <div className="flex flex-col sm:flex-row items-center gap-4 p-4 border rounded-lg bg-gray-50/50">
+      <Button 
+        type="button" 
+        variant="outline" 
+        size="square-lg" 
+        className="w-full sm:w-64 h-24 text-center flex flex-col gap-2 shrink-0"
+        onClick={() => handleSaveSection(sectionKey)}
+        disabled={loading || isFetching || !!savingSection}
+      >
+        {savingSection === sectionKey ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />}
+        <span className="text-sm font-bold whitespace-normal leading-tight">{label}</span>
+      </Button>
+      <div className="flex-1 w-full">
+        <Label htmlFor={name} className="mb-2 block text-xs font-bold uppercase text-gray-500">Enter Weight (kg)</Label>
+        <Input 
+          id={name} 
+          name={name} 
+          type="number" 
+          step="0.01" 
+          value={value} 
+          onChange={handleChange} 
+          placeholder="0"
+          className="h-16 text-xl font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          disabled={isFetching || !!savingSection}
+        />
+      </div>
+    </div>
+  );
+
   return (
-    <Card className="max-w-2xl mx-auto">
+    <Card className="w-full">
       <CardHeader>
         <CardTitle>Production Entry</CardTitle>
-        <CardDescription>Enter daily usage weights for materials.</CardDescription>
       </CardHeader>
-      <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label>Date</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant={"outline"}
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !date && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date ? format(date, "PPP") : <span>Pick a date</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={(d) => d && setDate(d)}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
+      <CardContent className="space-y-6">
+        <div className="space-y-2">
+          <Label>Date</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={"outline"}
+                className={cn(
+                  "w-full justify-start text-left font-normal",
+                  !date && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {date ? format(date, "PPP") : <span>Pick a date</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={(d) => d && setDate(d)}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="plyUsage">Calender PLY & CH (kg)</Label>
-              <Input 
-                id="plyUsage" 
-                name="plyUsage" 
-                type="number" 
-                step="0.01" 
-                value={formData.plyUsage} 
-                onChange={handleChange} 
-                placeholder="0.00"
-                disabled={isFetching}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="bicUsage">Cutting BIC (kg)</Label>
-              <Input 
-                id="bicUsage" 
-                name="bicUsage" 
-                type="number" 
-                step="0.01" 
-                value={formData.bicUsage} 
-                onChange={handleChange} 
-                placeholder="0.00"
-                disabled={isFetching}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="mixingRubberUsage">Mixing Rubber (kg)</Label>
-              <Input 
-                id="mixingRubberUsage" 
-                name="mixingRubberUsage" 
-                type="number" 
-                step="0.01" 
-                value={formData.mixingRubberUsage} 
-                onChange={handleChange} 
-                placeholder="0.00"
-                disabled={isFetching}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="extrusionRubberUsage">Extrusion Rubber (kg)</Label>
-              <Input 
-                id="extrusionRubberUsage" 
-                name="extrusionRubberUsage" 
-                type="number" 
-                step="0.01" 
-                value={formData.extrusionRubberUsage} 
-                onChange={handleChange} 
-                placeholder="0.00"
-                disabled={isFetching}
-              />
-            </div>
-          </div>
+        <div className="space-y-4">
+          <ProductionRow 
+            label="Calender PLY & CH (kg)" 
+            name="plyUsage" 
+            value={formData.plyUsage} 
+            sectionKey="plyUsage"
+          />
+          <ProductionRow 
+            label="Cutting BIC (kg)" 
+            name="bicUsage" 
+            value={formData.bicUsage} 
+            sectionKey="bicUsage"
+          />
+          <ProductionRow 
+            label="Mixing Rubber (kg)" 
+            name="mixingRubberUsage" 
+            value={formData.mixingRubberUsage} 
+            sectionKey="mixingRubberUsage"
+          />
+          <ProductionRow 
+            label="Extrusion Rubber (kg)" 
+            name="extrusionRubberUsage" 
+            value={formData.extrusionRubberUsage} 
+            sectionKey="extrusionRubberUsage"
+          />
+        </div>
 
-          {message && (
-            <div className={cn("text-sm font-medium", message.includes('Error') ? "text-red-500" : "text-green-600")}>
-              {message}
-            </div>
-          )}
-        </CardContent>
-        <CardFooter>
-          <Button type="submit" disabled={loading || isFetching} className="w-full">
-            {(loading || isFetching) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isFetching ? 'Loading existing data...' : 'Save Production Data'}
+        <div className="pt-4">
+          <Button 
+            onClick={() => handleSaveSection('All Sections')} 
+            disabled={loading || isFetching || !!savingSection}
+            className="w-full h-16 text-lg font-bold uppercase tracking-wider"
+          >
+            {savingSection === 'All Sections' ? <Loader2 className="mr-2 h-6 w-6 animate-spin" /> : <Save className="mr-2 h-6 w-6" />}
+            Save All Sections Combined
           </Button>
-        </CardFooter>
-      </form>
+        </div>
+
+        {message && (
+          <div className={cn("text-sm font-medium p-3 rounded-md", message.includes('Error') ? "bg-red-50 text-red-500" : "bg-green-50 text-green-600")}>
+            {message}
+          </div>
+        )}
+      </CardContent>
     </Card>
   );
 }
