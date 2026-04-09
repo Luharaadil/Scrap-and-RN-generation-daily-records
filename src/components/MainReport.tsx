@@ -22,9 +22,20 @@ export function MainReport() {
   const [error, setError] = useState('');
   const [copiedText, setCopiedText] = useState(false);
   const [copiedImage, setCopiedImage] = useState(false);
-  const [detailModal, setDetailModal] = useState<{date: Date, type: 'BIC' | 'PLY_CHAFER' | 'RUBBER' | 'RN'} | null>(null);
+  const [detailModal, setDetailModal] = useState<{date: Date, type: 'BIC' | 'PLY_CHAFER' | 'RUBBER_MIXING' | 'RN'} | null>(null);
   const [isEditingFont, setIsEditingFont] = useState(false);
   const [rowFontSizes, setRowFontSizes] = useState<Record<string, number>>({});
+  const [targets, setTargets] = useState<Record<string, { value: number, period: 'daily' | 'weekly' | 'monthly' | 'not_use' }>>({
+    bic_scrap: { value: 0, period: 'daily' },
+    ply_scrap: { value: 0, period: 'daily' },
+    rubber_scrap: { value: 0, period: 'monthly' },
+    rn_scrap: { value: 0, period: 'daily' },
+    bic_rate: { value: 1.5, period: 'daily' },
+    ply_rate: { value: 1.5, period: 'daily' },
+    rubber_rate: { value: 1.5, period: 'daily' },
+    rn_rate: { value: 95, period: 'daily' },
+  });
+  const [isEditingTargets, setIsEditingTargets] = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
   const { setControls, sidebarOpen } = useSidebar();
 
@@ -198,21 +209,33 @@ export function MainReport() {
     
     const rowsData = [
       // BIC
-      days.map(d => getSummaryForDate(d).bicUsage || '0'),
+      days.map(d => getSummaryForDate(d)?.bicUsage || '0'),
       days.map(d => getCustomScrapForDate(d, 'BIC') || '0'),
-      days.map(d => calculateRate(getCustomScrapForDate(d, 'BIC'), getSummaryForDate(d).bicUsage)),
+      days.map(d => calculateRate(getCustomScrapForDate(d, 'BIC'), getSummaryForDate(d)?.bicUsage)),
       // PLY + Chafer
-      days.map(d => getSummaryForDate(d).plyUsage || '0'),
+      days.map(d => getSummaryForDate(d)?.plyUsage || '0'),
       days.map(d => getCustomScrapForDate(d, 'PLY_CHAFER') || '0'),
-      days.map(d => calculateRate(getCustomScrapForDate(d, 'PLY_CHAFER'), getSummaryForDate(d).plyUsage)),
+      days.map(d => calculateRate(getCustomScrapForDate(d, 'PLY_CHAFER'), getSummaryForDate(d)?.plyUsage)),
       // Rubber Mixing
-      days.map(d => getSummaryForDate(d).mixingRubberUsage || getSummaryForDate(d).rubberUsage || '0'),
+      days.map(d => {
+        const s = getSummaryForDate(d);
+        return s?.mixingRubberUsage || s?.rubberUsage || '0';
+      }),
       days.map(d => getCustomScrapForDate(d, 'RUBBER_MIXING') || '0'),
-      days.map(d => calculateRate(getCustomScrapForDate(d, 'RUBBER_MIXING'), getSummaryForDate(d).mixingRubberUsage || getSummaryForDate(d).rubberUsage)),
+      days.map(d => {
+        const s = getSummaryForDate(d);
+        return calculateRate(getCustomScrapForDate(d, 'RUBBER_MIXING'), s?.mixingRubberUsage || s?.rubberUsage);
+      }),
       // RN
-      days.map(d => getSummaryForDate(d).mixingRubberUsage || getSummaryForDate(d).rubberUsage || '0'),
+      days.map(d => {
+        const s = getSummaryForDate(d);
+        return s?.extrusionRubberUsage || '0';
+      }),
       days.map(d => getCustomScrapForDate(d, 'RN') || '0'),
-      days.map(d => calculateRate(getCustomScrapForDate(d, 'RN'), getSummaryForDate(d).mixingRubberUsage || getSummaryForDate(d).rubberUsage)),
+      days.map(d => {
+        const s = getSummaryForDate(d);
+        return calculateRate(getCustomScrapForDate(d, 'RN'), s?.extrusionRubberUsage);
+      }),
     ];
 
     const tsv = rowsData.map(row => row.join('\t')).join('\n');
@@ -301,26 +324,53 @@ export function MainReport() {
 
   const renderCell = (d: Date, type: 'BIC' | 'PLY_CHAFER' | 'RUBBER_MIXING' | 'RN', value: any, rowId: string) => {
     let displayValue: React.ReactNode = '';
+    let isOverTarget = false;
     
     if (value === null || value === undefined || value === '') {
       displayValue = '';
     } else if (typeof value === 'number') {
       displayValue = value === 0 ? '0' : value.toFixed(1);
+      
+      // Check target
+      const target = targets[rowId];
+      if (target && target.period !== 'not_use' && target.value > 0) {
+        if (target.period === 'daily') {
+          isOverTarget = value > target.value;
+        } else if (target.period === 'weekly' || target.period === 'monthly') {
+          // For weekly/monthly, we might want to check the total or just highlight if daily is high
+          // User said "mixing rubber is for monthly target", let's assume they want to check daily against (monthly/30)
+          const dailyTarget = target.period === 'monthly' ? target.value / 30 : target.value / 7;
+          isOverTarget = value > dailyTarget;
+        }
+      }
     } else if (typeof value === 'string') {
       if (value === '0' || value === '0%' || value === '0.000%') {
         displayValue = '0';
       } else {
         displayValue = value;
+        
+        // Check rate targets
+        if (rowId.endsWith('_rate')) {
+          const numValue = parseFloat(value);
+          const target = targets[rowId];
+          if (target && target.period !== 'not_use' && target.value > 0 && !isNaN(numValue)) {
+            // User requested: "In RN rate need to show when it is over than that highlight"
+            isOverTarget = numValue > target.value;
+          }
+        }
       }
     }
     
     return (
       <TableCell 
         key={d.toISOString()} 
-        className="border border-gray-300 text-center cursor-pointer hover:bg-black/5 transition-colors"
+        className={cn(
+          "border border-gray-300 text-center cursor-pointer hover:bg-black/5 transition-colors",
+          isOverTarget && "bg-red-100 text-red-700 font-bold"
+        )}
         style={{ fontSize: rowFontSizes[rowId] ? `${rowFontSizes[rowId]}px` : undefined }}
         onDoubleClick={() => setDetailModal({ date: d, type })}
-        title="Double click to view scrap details"
+        title={isOverTarget ? "Exceeds target standard!" : "Double click to view scrap details"}
       >
         {displayValue}
       </TableCell>
@@ -352,12 +402,22 @@ export function MainReport() {
       )}
 
       <Card className="overflow-hidden">
-        <CardHeader className="text-center pb-2">
-          <CardTitle className="text-2xl">MRI Production Weekly Report MRI 生產週報</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0 overflow-x-auto">
-          <div ref={tableRef} className="bg-white p-4">
-            <Table className="border-collapse border border-gray-300 w-full min-w-[800px]">
+        <div ref={tableRef} className="bg-white">
+          <CardHeader className="text-center pb-2 relative">
+            <CardTitle className="text-2xl">MRI Production Weekly Report MRI 生產週報</CardTitle>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="absolute right-4 top-4 h-8 w-8 p-0" 
+              onClick={() => setIsEditingTargets(true)}
+              title="Target Settings"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </CardHeader>
+          <CardContent className="p-0 overflow-x-auto">
+            <div className="p-4">
+              <Table className="border-collapse border border-gray-300 w-full min-w-[800px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className="border border-gray-300 bg-gray-50 font-semibold text-center min-w-[150px] max-w-[250px] whitespace-normal">
@@ -454,7 +514,8 @@ export function MainReport() {
             </Table>
           </div>
         </CardContent>
-      </Card>
+      </div>
+    </Card>
 
       {detailModal && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm">
@@ -515,6 +576,63 @@ export function MainReport() {
                   </TableBody>
                 </Table>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isEditingTargets && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col overflow-hidden">
+            <div className="p-4 border-b flex justify-between items-center bg-gray-50">
+              <h2 className="text-lg font-semibold">Target Settings</h2>
+              <Button variant="ghost" size="icon" onClick={() => setIsEditingTargets(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="p-4 space-y-4 overflow-y-auto max-h-[70vh]">
+              {(Object.keys(targets) as Array<keyof typeof targets>).map((key) => {
+                const target = targets[key];
+                return (
+                  <div key={key} className="space-y-2 border-b pb-3 last:border-0">
+                    <label className="text-sm font-bold capitalize">{(key as string).replace('_', ' ')}</label>
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <label className="text-[10px] text-gray-500 uppercase">Target Value</label>
+                        <input 
+                          type="number" 
+                          step="0.01"
+                          className="w-full border rounded px-2 py-1 text-sm"
+                          value={target.value}
+                          onChange={(e) => setTargets(prev => ({
+                            ...prev,
+                            [key]: { ...prev[key], value: parseFloat(e.target.value) || 0 }
+                          }))}
+                        />
+                      </div>
+                      <div className="w-32">
+                        <label className="text-[10px] text-gray-500 uppercase">Period</label>
+                        <select 
+                          className="w-full border rounded px-2 py-1 text-sm"
+                          value={target.period}
+                          onChange={(e) => setTargets(prev => ({
+                            ...prev,
+                            [key]: { ...prev[key], period: e.target.value as any }
+                          }))}
+                        >
+                          <option value="daily">Daily</option>
+                          <option value="weekly">Weekly</option>
+                          <option value="monthly">Monthly</option>
+                          <option value="not_use">Not use</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="p-4 border-t bg-gray-50 flex justify-end">
+              <Button onClick={() => setIsEditingTargets(false)}>Done</Button>
             </div>
           </div>
         </div>
