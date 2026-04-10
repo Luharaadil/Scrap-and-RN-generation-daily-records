@@ -9,44 +9,51 @@ import { Input } from '@/src/components/ui/input';
 import { Label } from '@/src/components/ui/label';
 import { saveProductionSummary, fetchSummaryAndScraps, getWebAppUrl } from '@/src/lib/api';
 import { cn } from '@/src/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/components/ui/select';
+import { useData } from '@/src/lib/DataContext';
 
-function ProductionRow({ label, name, value, sectionKey, onChange, onSave, loading, isFetching, savingSection }: { 
+function ProductionRow({ label, sectionKey, values, onChange, onSave, loading, isFetching, savingSection }: { 
   label: string, 
-  name: string, 
-  value: string, 
   sectionKey: string,
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void,
+  values: Record<string, string>,
+  onChange: (shift: string, value: string) => void,
   onSave: (sectionKey: string) => void,
   loading: boolean,
   isFetching: boolean,
   savingSection: string | null
 }) {
+  const shifts = ['A', 'B', 'C', 'A1', 'C1'];
   return (
-    <div className="flex flex-col sm:flex-row items-center gap-4 p-4 border rounded-lg bg-gray-50/50">
-      <Button 
-        type="button" 
-        variant="outline" 
-        size="square-lg" 
-        className="w-full sm:w-64 h-24 text-center flex flex-col gap-2 shrink-0"
-        onClick={() => onSave(sectionKey)}
-        disabled={loading || isFetching || !!savingSection}
-      >
-        {savingSection === sectionKey ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />}
-        <span className="text-sm font-bold whitespace-normal leading-tight">{label}</span>
-      </Button>
-      <div className="flex-1 w-full">
-        <Label htmlFor={name} className="mb-2 block text-xs font-bold uppercase text-gray-500">Enter Weight (kg)</Label>
-        <Input 
-          id={name} 
-          name={name} 
-          type="number" 
-          step="0.01" 
-          value={value} 
-          onChange={onChange} 
-          placeholder="0"
-          className="h-16 text-xl font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-          disabled={isFetching || !!savingSection}
-        />
+    <div className="flex flex-col gap-4 p-4 border rounded-lg bg-gray-50/50">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="text-sm font-bold whitespace-normal leading-tight text-primary uppercase">{label}</div>
+        <Button 
+          type="button" 
+          variant="outline" 
+          size="sm"
+          className="h-10 px-4"
+          onClick={() => onSave(sectionKey)}
+          disabled={loading || isFetching || !!savingSection}
+        >
+          {savingSection === sectionKey ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+          Save {label.split(' ')[0]}
+        </Button>
+      </div>
+      <div className="grid grid-cols-5 gap-2">
+        {shifts.map(shift => (
+          <div key={shift} className="space-y-1">
+            <Label className="text-[10px] uppercase text-gray-400 text-center block">Shift {shift}</Label>
+            <Input 
+              type="number" 
+              step="1" 
+              value={values[shift] || ''} 
+              onChange={(e) => onChange(shift, e.target.value)} 
+              placeholder="0"
+              className="h-12 text-center font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              disabled={isFetching || !!savingSection}
+            />
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -57,12 +64,13 @@ export function ProductionEntry() {
   const [loading, setLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
   const [message, setMessage] = useState('');
+  const { loadData } = useData();
   
-  const [formData, setFormData] = useState({
-    bicUsage: '',
-    plyUsage: '',
-    extrusionRubberUsage: '',
-    mixingRubberUsage: ''
+  const [formData, setFormData] = useState<Record<string, Record<string, string>>>({
+    bicUsage: { A: '', B: '', C: '', A1: '', C1: '' },
+    plyUsage: { A: '', B: '', C: '', A1: '', C1: '' },
+    extrusionRubberUsage: { A: '', B: '', C: '', A1: '', C1: '' },
+    mixingRubberUsage: { A: '', B: '', C: '', A1: '', C1: '' }
   });
   const [savingSection, setSavingSection] = useState<string | null>(null);
 
@@ -74,16 +82,26 @@ export function ProductionEntry() {
       try {
         const formattedDate = format(date, 'yyyy-MM-dd');
         const result = await fetchSummaryAndScraps(formattedDate);
-        if (result && result.summary) {
-          setFormData({
-            bicUsage: result.summary.bicUsage || '0',
-            plyUsage: result.summary.plyUsage || '0',
-            extrusionRubberUsage: result.summary.extrusionRubberUsage || result.summary.chaferUsage || '0',
-            mixingRubberUsage: result.summary.mixingRubberUsage || result.summary.rubberUsage || '0'
+        
+        const newFormData: any = {
+          bicUsage: { A: '0', B: '0', C: '0', A1: '0', C1: '0' },
+          plyUsage: { A: '0', B: '0', C: '0', A1: '0', C1: '0' },
+          extrusionRubberUsage: { A: '0', B: '0', C: '0', A1: '0', C1: '0' },
+          mixingRubberUsage: { A: '0', B: '0', C: '0', A1: '0', C1: '0' }
+        };
+
+        if (result && result.summaries) {
+          result.summaries.forEach((s: any) => {
+            const shift = s.shift;
+            if (newFormData.bicUsage[shift] !== undefined) {
+              newFormData.bicUsage[shift] = Math.round(Number(s.bicUsage || 0)).toString();
+              newFormData.plyUsage[shift] = Math.round(Number(s.plyUsage || 0)).toString();
+              newFormData.extrusionRubberUsage[shift] = Math.round(Number(s.extrusionRubberUsage || s.chaferUsage || 0)).toString();
+              newFormData.mixingRubberUsage[shift] = Math.round(Number(s.mixingRubberUsage || s.rubberUsage || 0)).toString();
+            }
           });
-        } else {
-          setFormData({ bicUsage: '0', plyUsage: '0', extrusionRubberUsage: '0', mixingRubberUsage: '0' });
         }
+        setFormData(newFormData);
       } catch (err: any) {
         console.error("Failed to load existing data:", err);
       } finally {
@@ -94,8 +112,14 @@ export function ProductionEntry() {
     loadExistingData();
   }, [date]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleShiftChange = (sectionKey: string, shift: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [sectionKey]: {
+        ...prev[sectionKey],
+        [shift]: value
+      }
+    }));
   };
 
   const handleSaveSection = async (sectionKey: string) => {
@@ -103,22 +127,53 @@ export function ProductionEntry() {
     setMessage('');
     
     try {
-      await saveProductionSummary({
-        date: format(date, 'yyyy-MM-dd'),
-        timestamp: new Date().toISOString(),
-        bicUsage: formData.bicUsage || 0,
-        bicScrap: 0,
-        plyUsage: formData.plyUsage || 0,
-        plyScrap: 0,
-        rubberUsage: formData.mixingRubberUsage || 0,
-        rubberScrap: 0,
-        rnScrap: 0,
-        chaferUsage: formData.extrusionRubberUsage || 0,
-        chaferScrap: 0,
-        extrusionRubberUsage: formData.extrusionRubberUsage || 0,
-        mixingRubberUsage: formData.mixingRubberUsage || 0
-      });
-      setMessage(`${sectionKey.replace('Usage', '')} data saved successfully!`);
+      const shifts = ['A', 'B', 'C', 'A1', 'C1'];
+      
+      if (sectionKey === 'All Sections') {
+        // Save all shifts for all sections
+        for (const shift of shifts) {
+          await saveProductionSummary({
+            date: format(date, 'yyyy-MM-dd'),
+            shift: shift,
+            timestamp: new Date().toISOString(),
+            bicUsage: formData.bicUsage[shift] || 0,
+            bicScrap: 0,
+            plyUsage: formData.plyUsage[shift] || 0,
+            plyScrap: 0,
+            rubberUsage: formData.mixingRubberUsage[shift] || 0,
+            rubberScrap: 0,
+            rnScrap: 0,
+            chaferUsage: formData.extrusionRubberUsage[shift] || 0,
+            chaferScrap: 0,
+            extrusionRubberUsage: formData.extrusionRubberUsage[shift] || 0,
+            mixingRubberUsage: formData.mixingRubberUsage[shift] || 0
+          });
+        }
+        setMessage(`All sections for all shifts saved successfully!`);
+      } else {
+        // Save all shifts for one section
+        for (const shift of shifts) {
+          await saveProductionSummary({
+            date: format(date, 'yyyy-MM-dd'),
+            shift: shift,
+            timestamp: new Date().toISOString(),
+            bicUsage: formData.bicUsage[shift] || 0,
+            bicScrap: 0,
+            plyUsage: formData.plyUsage[shift] || 0,
+            plyScrap: 0,
+            rubberUsage: formData.mixingRubberUsage[shift] || 0,
+            rubberScrap: 0,
+            rnScrap: 0,
+            chaferUsage: formData.extrusionRubberUsage[shift] || 0,
+            chaferScrap: 0,
+            extrusionRubberUsage: formData.extrusionRubberUsage[shift] || 0,
+            mixingRubberUsage: formData.mixingRubberUsage[shift] || 0
+          });
+        }
+        setMessage(`${sectionKey.replace('Usage', '')} data for all shifts saved successfully!`);
+      }
+      
+      loadData(true); // Refresh global data
     } catch (err: any) {
       setMessage(`Error: ${err.message}`);
     } finally {
@@ -132,7 +187,7 @@ export function ProductionEntry() {
         <CardTitle>Production Entry</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="space-y-2">
+        <div className="max-w-xs">
           <Label>Date</Label>
           <Popover>
             <PopoverTrigger asChild>
@@ -161,10 +216,9 @@ export function ProductionEntry() {
         <div className="space-y-4">
           <ProductionRow 
             label="Calender PLY & CH (kg)" 
-            name="plyUsage" 
-            value={formData.plyUsage} 
             sectionKey="plyUsage"
-            onChange={handleChange}
+            values={formData.plyUsage} 
+            onChange={(shift, val) => handleShiftChange('plyUsage', shift, val)}
             onSave={handleSaveSection}
             loading={loading}
             isFetching={isFetching}
@@ -172,10 +226,9 @@ export function ProductionEntry() {
           />
           <ProductionRow 
             label="Cutting BIC (kg)" 
-            name="bicUsage" 
-            value={formData.bicUsage} 
             sectionKey="bicUsage"
-            onChange={handleChange}
+            values={formData.bicUsage} 
+            onChange={(shift, val) => handleShiftChange('bicUsage', shift, val)}
             onSave={handleSaveSection}
             loading={loading}
             isFetching={isFetching}
@@ -183,10 +236,9 @@ export function ProductionEntry() {
           />
           <ProductionRow 
             label="Mixing Rubber (kg)" 
-            name="mixingRubberUsage" 
-            value={formData.mixingRubberUsage} 
             sectionKey="mixingRubberUsage"
-            onChange={handleChange}
+            values={formData.mixingRubberUsage} 
+            onChange={(shift, val) => handleShiftChange('mixingRubberUsage', shift, val)}
             onSave={handleSaveSection}
             loading={loading}
             isFetching={isFetching}
@@ -194,10 +246,9 @@ export function ProductionEntry() {
           />
           <ProductionRow 
             label="Extrusion Rubber (kg)" 
-            name="extrusionRubberUsage" 
-            value={formData.extrusionRubberUsage} 
             sectionKey="extrusionRubberUsage"
-            onChange={handleChange}
+            values={formData.extrusionRubberUsage} 
+            onChange={(shift, val) => handleShiftChange('extrusionRubberUsage', shift, val)}
             onSave={handleSaveSection}
             loading={loading}
             isFetching={isFetching}

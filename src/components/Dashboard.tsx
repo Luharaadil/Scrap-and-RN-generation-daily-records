@@ -7,53 +7,35 @@ import { Button } from '@/src/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/components/ui/select';
-import { fetchSummaryAndScraps, getWebAppUrl } from '@/src/lib/api';
+import { getWebAppUrl } from '@/src/lib/api';
 import { cn } from '@/src/lib/utils';
+import { useData } from '@/src/lib/DataContext';
 
 export function Dashboard() {
   const [date, setDate] = useState<Date>(new Date());
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<any>(null);
-  const [error, setError] = useState('');
+  const { data, loading, error, loadData } = useData();
   
   const [shiftFilter, setShiftFilter] = useState('All');
   const [sectionFilter, setSectionFilter] = useState('All');
 
-  const loadData = async () => {
-    if (!getWebAppUrl()) return;
-    
-    setLoading(true);
-    setError('');
-    try {
-      const formattedDate = format(date, 'yyyy-MM-dd');
-      const result = await fetchSummaryAndScraps(formattedDate);
-      setData(result);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, [date]);
-
-  const rawSummary = data?.summary || {};
-  const summary = {
-    bicUsage: rawSummary.bicUsage || 0,
-    bicScrap: rawSummary.bicScrap || 0,
-    plyUsage: rawSummary.plyUsage || 0,
-    plyScrap: rawSummary.plyScrap || 0,
-    rubberUsage: rawSummary.rubberUsage || 0,
-    rubberScrap: rawSummary.rubberScrap || 0,
-    rnScrap: rawSummary.rnScrap || 0,
-    chaferUsage: rawSummary.chaferUsage || 0,
-    chaferScrap: rawSummary.chaferScrap || 0,
-    extrusionRubberUsage: rawSummary.extrusionRubberUsage || 0
-  };
+  const rawSummary = data?.summaries?.filter((s: any) => s.date === format(date, 'yyyy-MM-dd')) || [];
   
-  const scraps = data?.scraps || [];
+  const summary = rawSummary.reduce((acc: any, curr: any) => ({
+    bicUsage: (acc.bicUsage || 0) + Number(curr.bicUsage || 0),
+    bicScrap: (acc.bicScrap || 0) + Number(curr.bicScrap || 0),
+    plyUsage: (acc.plyUsage || 0) + Number(curr.plyUsage || 0),
+    plyScrap: (acc.plyScrap || 0) + Number(curr.plyScrap || 0),
+    rubberUsage: (acc.rubberUsage || 0) + Number(curr.rubberUsage || 0),
+    rubberScrap: (acc.rubberScrap || 0) + Number(curr.rubberScrap || 0),
+    rnScrap: (acc.rnScrap || 0) + Number(curr.rnScrap || 0),
+    chaferUsage: (acc.chaferUsage || 0) + Number(curr.chaferUsage || 0),
+    chaferScrap: (acc.chaferScrap || 0) + Number(curr.chaferScrap || 0),
+    extrusionRubberUsage: (acc.extrusionRubberUsage || 0) + Number(curr.extrusionRubberUsage || 0)
+  }), {
+    bicUsage: 0, bicScrap: 0, plyUsage: 0, plyScrap: 0, rubberUsage: 0, rubberScrap: 0, rnScrap: 0, chaferUsage: 0, chaferScrap: 0, extrusionRubberUsage: 0
+  });
+  
+  const scraps = data?.scraps?.filter((s: any) => s.date === format(date, 'yyyy-MM-dd')) || [];
 
   const filteredScraps = scraps.filter((scrap: any) => {
     if (shiftFilter !== 'All' && scrap.shift !== shiftFilter) return false;
@@ -166,7 +148,7 @@ export function Dashboard() {
           </Select>
         </div>
 
-        <Button variant="outline" size="icon" onClick={loadData} disabled={loading}>
+        <Button variant="outline" size="icon" onClick={() => loadData(true)} disabled={loading}>
           <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
         </Button>
       </div>

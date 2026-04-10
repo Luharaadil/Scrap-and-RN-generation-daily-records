@@ -8,6 +8,7 @@ import { Button } from '@/src/components/ui/button';
 import { LayoutDashboard, FileText, PlusCircle, AlertCircle, Menu, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { SidebarProvider, useSidebar } from '@/src/lib/SidebarContext';
+import { DataProvider } from '@/src/lib/DataContext';
 
 function AppContent() {
   const { controls, sidebarOpen, setSidebarOpen } = useSidebar();
@@ -130,7 +131,9 @@ function AppContent() {
 export default function App() {
   return (
     <SidebarProvider>
-      <AppContent />
+      <DataProvider>
+        <AppContent />
+      </DataProvider>
     </SidebarProvider>
   );
 }

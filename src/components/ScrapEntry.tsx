@@ -10,12 +10,14 @@ import { Label } from '@/src/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/components/ui/select';
 import { saveScrapDetails } from '@/src/lib/api';
 import { cn } from '@/src/lib/utils';
+import { useData } from '@/src/lib/DataContext';
 
 export function ScrapEntry() {
   const [date, setDate] = useState<Date>(new Date());
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { loadData } = useData();
   
   const [formData, setFormData] = useState({
     material: '',
@@ -103,6 +105,7 @@ export function ScrapEntry() {
       });
       
       setMessage('Scrap data saved successfully!');
+      loadData(true);
       setFormData({ material: '', materialName: '', weight: '', reason: '', shift: '', section: '', customSection: '' });
       clearImage();
     } catch (err: any) {
@@ -287,21 +290,21 @@ export function ScrapEntry() {
             </div>
           )}
           
-          <div className="pt-4 flex flex-row justify-center gap-2 sm:gap-4">
+          <div className="pt-4 flex flex-row flex-nowrap justify-center gap-2 sm:gap-4">
             <Button 
               type="button" 
               variant="outline" 
               size="square-lg" 
               onClick={() => fileInputRef.current?.click()}
-              className="flex-1 h-24"
+              className="flex-1 h-20 sm:h-24"
             >
-              <Upload className="h-5 w-5 sm:h-6 sm:w-6" />
-              <span className="text-xs sm:text-sm">Upload Picture</span>
+              <Upload className="h-4 w-4 sm:h-6 sm:w-6" />
+              <span className="text-[10px] sm:text-sm">Upload Picture</span>
             </Button>
 
-            <Button type="submit" disabled={loading} size="square-lg" className="flex-1 h-24">
-              {loading ? <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 animate-spin" /> : <Save className="h-5 w-5 sm:h-6 sm:w-6" />}
-              <span className="text-xs sm:text-sm">{loading ? 'Saving...' : 'Save Scrap'}</span>
+            <Button type="submit" disabled={loading} size="square-lg" className="flex-1 h-20 sm:h-24">
+              {loading ? <Loader2 className="h-4 w-4 sm:h-6 sm:w-6 animate-spin" /> : <Save className="h-4 w-4 sm:h-6 sm:w-6" />}
+              <span className="text-[10px] sm:text-sm">{loading ? 'Saving...' : 'Save Scrap'}</span>
             </Button>
           </div>
         </CardContent>

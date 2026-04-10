@@ -11,33 +11,26 @@ import { fetchRangeData, fetchTargets, getWebAppUrl } from '@/src/lib/api';
 import { cn } from '@/src/lib/utils';
 import { DateRange } from 'react-day-picker';
 import { useSidebar } from '@/src/lib/SidebarContext';
+import { useData } from '@/src/lib/DataContext';
 
 export function MainReport() {
   const [date, setDate] = useState<DateRange | undefined>({
     from: startOfWeek(new Date(), { weekStartsOn: 1 }),
     to: endOfWeek(new Date(), { weekStartsOn: 1 }),
   });
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<any>(null);
-  const [error, setError] = useState('');
+  const { data, targets, loading, error, loadData, loadTargets, updateTargets, isSyncingTargets } = useData();
   const [copiedText, setCopiedText] = useState(false);
   const [copiedImage, setCopiedImage] = useState(false);
   const [detailModal, setDetailModal] = useState<{date: Date, type: 'BIC' | 'PLY_CHAFER' | 'RUBBER_MIXING' | 'RN'} | null>(null);
+  const [usageDetailModal, setUsageDetailModal] = useState<{date: Date, type: 'BIC' | 'PLY_CHAFER' | 'RUBBER_MIXING' | 'RN'} | null>(null);
+  const [highlightedCol, setHighlightedCol] = useState<number | null>(null);
+  const [modalCopied, setModalCopied] = useState(false);
   const [isEditingFont, setIsEditingFont] = useState(false);
   const [rowFontSizes, setRowFontSizes] = useState<Record<string, number>>({});
-  const [targets, setTargets] = useState<Record<string, { value: number, period: 'daily' | 'weekly' | 'monthly' | 'not_use' }>>({
-    bic_scrap: { value: 0, period: 'daily' },
-    ply_scrap: { value: 0, period: 'daily' },
-    rubber_scrap: { value: 0, period: 'monthly' },
-    rn_scrap: { value: 0, period: 'daily' },
-    bic_rate: { value: 1.5, period: 'daily' },
-    ply_rate: { value: 1.5, period: 'daily' },
-    rubber_rate: { value: 1.5, period: 'daily' },
-    rn_rate: { value: 95, period: 'daily' },
-  });
   const [isEditingTargets, setIsEditingTargets] = useState(false);
-  const [isSyncingTargets, setIsSyncingTargets] = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
+  const scrapModalRef = useRef<HTMLDivElement>(null);
+  const usageModalRef = useRef<HTMLDivElement>(null);
   const { setControls, sidebarOpen } = useSidebar();
 
   const adjustFontSize = (rowId: string, delta: number) => {
@@ -46,75 +39,6 @@ export function MainReport() {
       [rowId]: Math.max(8, (prev[rowId] || 14) + delta)
     }));
   };
-
-  const loadTargets = async () => {
-    if (!getWebAppUrl()) return;
-    setIsSyncingTargets(true);
-    try {
-      const targetResult = await fetchTargets();
-      if (targetResult && targetResult.targets) {
-        setTargets(prev => {
-          const newTargets: any = { ...prev };
-          targetResult.targets.forEach((t: any) => {
-            let rowId = '';
-            const cat = String(t.category || '').toLowerCase();
-            if (cat.includes('bic') && cat.includes('scrap')) rowId = 'bic_scrap';
-            else if (cat.includes('ply') && cat.includes('scrap')) rowId = 'ply_scrap';
-            else if (cat.includes('rubber') && cat.includes('scrap')) rowId = 'rubber_scrap';
-            else if (cat.includes('rn') && cat.includes('scrap')) rowId = 'rn_scrap';
-            else if (cat.includes('bic') && cat.includes('rate')) rowId = 'bic_rate';
-            else if (cat.includes('ply') && cat.includes('rate')) rowId = 'ply_rate';
-            else if (cat.includes('rubber') && cat.includes('rate')) rowId = 'rubber_rate';
-            else if (cat.includes('rn') && cat.includes('rate')) rowId = 'rn_rate';
-            
-            if (rowId) {
-              const period = String(t.period || '').toLowerCase();
-              newTargets[rowId] = {
-                value: Number(t.value || 0),
-                period: period === 'not use' ? 'not_use' : (['daily', 'weekly', 'monthly', 'not_use'].includes(period) ? period : 'daily')
-              };
-            }
-          });
-          return newTargets;
-        });
-      }
-    } catch (err) {
-      console.error('Failed to load targets:', err);
-    } finally {
-      setIsSyncingTargets(false);
-    }
-  };
-
-  const loadData = async () => {
-    if (!getWebAppUrl() || !date?.from || !date?.to) return;
-    
-    setLoading(true);
-    setError('');
-    try {
-      const startDate = format(startOfMonth(date.from), 'yyyy-MM-dd');
-      const endDate = format(date.to, 'yyyy-MM-dd');
-      const result = await fetchRangeData(startDate, endDate);
-      setData(result);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadTargets();
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    if (date?.from && date?.to) {
-      loadData().then(() => {
-        if (!active) return;
-      });
-    }
-    return () => { active = false; };
-  }, [date]);
 
   useEffect(() => {
     setControls(
@@ -205,8 +129,16 @@ export function MainReport() {
 
   const getSummaryForDate = (d: Date) => {
     const formattedDate = format(d, 'yyyy-MM-dd');
-    const summary = data?.summaries?.find((s: any) => s.date === formattedDate);
-    return summary || null;
+    const daySummaries = data?.summaries?.filter((s: any) => s.date === formattedDate) || [];
+    if (daySummaries.length === 0) return null;
+    
+    return daySummaries.reduce((acc: any, curr: any) => ({
+      ...curr,
+      bicUsage: (acc.bicUsage || 0) + Number(curr.bicUsage || 0),
+      plyUsage: (acc.plyUsage || 0) + Number(curr.plyUsage || 0),
+      extrusionRubberUsage: (acc.extrusionRubberUsage || 0) + Number(curr.extrusionRubberUsage || 0),
+      mixingRubberUsage: (acc.mixingRubberUsage || 0) + (Number(curr.mixingRubberUsage || 0) || Number(curr.rubberUsage || 0))
+    }), { bicUsage: 0, plyUsage: 0, extrusionRubberUsage: 0, mixingRubberUsage: 0 });
   };
 
   const getCustomScrapForDate = (d: Date, type: 'BIC' | 'PLY_CHAFER' | 'RUBBER_MIXING' | 'RN') => {
@@ -368,11 +300,21 @@ export function MainReport() {
   const renderCell = (d: Date, type: 'BIC' | 'PLY_CHAFER' | 'RUBBER_MIXING' | 'RN', value: any, rowId: string) => {
     let displayValue: React.ReactNode = '';
     let isOverTarget = false;
+    const isUsageRow = rowId.endsWith('_usage');
     
-    if (value === null || value === undefined || value === '') {
+    // Check if there is ANY data for this date at all
+    const formattedDate = format(d, 'yyyy-MM-dd');
+    const hasAnySummary = data?.summaries?.some((s: any) => s.date === formattedDate);
+    const hasAnyScrap = data?.scraps?.some((s: any) => s.date === formattedDate);
+    const hasData = hasAnySummary || hasAnyScrap;
+
+    if (!hasData) {
+      displayValue = '';
+    } else if (value === null || value === undefined || value === '') {
       displayValue = '';
     } else if (typeof value === 'number') {
-      displayValue = value === 0 ? '0' : value.toFixed(1);
+      // If value is 0 but we have data for the day, show 0. Otherwise blank.
+      displayValue = value === 0 ? '0' : (isUsageRow ? value.toFixed(0) : value.toFixed(1));
       
       // Check target
       const target = targets[rowId];
@@ -455,8 +397,14 @@ export function MainReport() {
           isOverTarget && "bg-red-100 text-red-700 font-bold"
         )}
         style={{ fontSize: rowFontSizes[rowId] ? `${rowFontSizes[rowId]}px` : undefined }}
-        onDoubleClick={() => setDetailModal({ date: d, type })}
-        title={isOverTarget ? "Exceeds target standard!" : "Double click to view scrap details"}
+        onDoubleClick={() => {
+          if (isUsageRow) {
+            setUsageDetailModal({ date: d, type });
+          } else {
+            setDetailModal({ date: d, type });
+          }
+        }}
+        title={isOverTarget ? "Exceeds target standard!" : `Double click to view ${isUsageRow ? 'usage' : 'scrap'} details`}
       >
         {displayValue}
       </TableCell>
@@ -480,6 +428,45 @@ export function MainReport() {
       )}
     </TableCell>
   );
+
+  const copyModalAsPicture = async (ref: React.RefObject<HTMLDivElement>, filename: string) => {
+    if (!ref.current) return;
+    try {
+      // To capture the full table even if scrolled, we temporarily remove constraints
+      const originalStyle = ref.current.getAttribute('style') || '';
+      const originalParentStyle = ref.current.parentElement?.getAttribute('style') || '';
+      
+      // Force full width and height for capture
+      ref.current.style.width = 'max-content';
+      ref.current.style.height = 'auto';
+      ref.current.style.overflow = 'visible';
+      if (ref.current.parentElement) {
+        ref.current.parentElement.style.overflow = 'visible';
+      }
+
+      const blob = await toBlob(ref.current, { 
+        backgroundColor: '#ffffff',
+        pixelRatio: 2,
+        style: {
+          transform: 'scale(1)',
+          transformOrigin: 'top left'
+        }
+      });
+
+      // Restore styles
+      ref.current.setAttribute('style', originalStyle);
+      if (ref.current.parentElement) {
+        ref.current.parentElement.setAttribute('style', originalParentStyle);
+      }
+
+      if (!blob) return;
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      setModalCopied(true);
+      setTimeout(() => setModalCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy modal picture', err);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -607,47 +594,53 @@ export function MainReport() {
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden">
             <div className="p-4 border-b flex justify-between items-center bg-gray-50">
-              <h2 className="text-lg font-semibold">
-                Scrap Details - {format(detailModal.date, 'PPP')} 
-                <span className="text-muted-foreground ml-2 text-sm">
-                  ({detailModal.type.replace('_', ' & ')})
-                </span>
-              </h2>
-              <Button variant="ghost" size="icon" onClick={() => setDetailModal(null)}>
+              <div className="flex items-center gap-4">
+                <h2 className="text-lg font-semibold">
+                  Scrap Details - {format(detailModal.date, 'PPP')} 
+                  <span className="text-muted-foreground ml-2 text-sm">
+                    ({detailModal.type.replace('_', ' & ')})
+                  </span>
+                </h2>
+                <Button variant="outline" size="sm" onClick={() => copyModalAsPicture(scrapModalRef, `Scrap_Details_${format(detailModal.date, 'yyyyMMdd')}`)}>
+                  {modalCopied ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <ImageIcon className="h-4 w-4 mr-2" />}
+                  {modalCopied ? 'Copied!' : 'Copy Picture'}
+                </Button>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => { setDetailModal(null); setHighlightedCol(null); }}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            <div className="p-4 overflow-auto flex-1">
+            <div className="p-4 overflow-auto flex-1" ref={scrapModalRef}>
               {getFilteredScrapsForModal().length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   No scrap records found for this date and material type.
                 </div>
               ) : (
-                <Table>
+                <Table className="border">
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Shift</TableHead>
-                      <TableHead>Section</TableHead>
-                      <TableHead>Material Type</TableHead>
-                      <TableHead>Material Name</TableHead>
-                      <TableHead>Weight (kg)</TableHead>
-                      <TableHead>Reason</TableHead>
-                      <TableHead>Picture</TableHead>
-                      <TableHead>Recorded At</TableHead>
+                      {['Date', 'Shift', 'Section', 'Material Type', 'Material Name', 'Weight (kg)', 'Reason', 'Picture', 'Recorded At'].map((head, idx) => (
+                        <TableHead 
+                          key={idx} 
+                          className={cn("cursor-pointer hover:bg-gray-100 transition-colors", highlightedCol === idx && "bg-yellow-100 text-yellow-900 font-bold")}
+                          onClick={() => setHighlightedCol(idx)}
+                        >
+                          {head}
+                        </TableHead>
+                      ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {getFilteredScrapsForModal().map((scrap: any, i: number) => (
                       <TableRow key={i}>
-                        <TableCell className="whitespace-nowrap">{scrap.date}</TableCell>
-                        <TableCell>{scrap.shift}</TableCell>
-                        <TableCell>{scrap.section}</TableCell>
-                        <TableCell className="font-medium">{scrap.material}</TableCell>
-                        <TableCell>{scrap.materialName || '-'}</TableCell>
-                        <TableCell>{typeof scrap.weight === 'number' ? (scrap.weight === 0 ? '0' : scrap.weight.toFixed(1)) : (scrap.weight || '0')}</TableCell>
-                        <TableCell>{scrap.reason}</TableCell>
-                        <TableCell>
+                        <TableCell className={cn("whitespace-nowrap", highlightedCol === 0 && "bg-yellow-50")}>{scrap.date}</TableCell>
+                        <TableCell className={cn(highlightedCol === 1 && "bg-yellow-50")}>{scrap.shift}</TableCell>
+                        <TableCell className={cn(highlightedCol === 2 && "bg-yellow-50")}>{scrap.section}</TableCell>
+                        <TableCell className={cn("font-medium", highlightedCol === 3 && "bg-yellow-50")}>{scrap.material}</TableCell>
+                        <TableCell className={cn(highlightedCol === 4 && "bg-yellow-50")}>{scrap.materialName || '-'}</TableCell>
+                        <TableCell className={cn(highlightedCol === 5 && "bg-yellow-50")}>{typeof scrap.weight === 'number' ? (scrap.weight === 0 ? '0' : scrap.weight.toFixed(1)) : (scrap.weight || '0')}</TableCell>
+                        <TableCell className={cn(highlightedCol === 6 && "bg-yellow-50")}>{scrap.reason}</TableCell>
+                        <TableCell className={cn(highlightedCol === 7 && "bg-yellow-50")}>
                           {scrap.imageUrl ? (
                             <a href={scrap.imageUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
                               View Image
@@ -656,12 +649,112 @@ export function MainReport() {
                             <span className="text-muted-foreground text-sm">No image</span>
                           )}
                         </TableCell>
-                        <TableCell className="text-muted-foreground whitespace-nowrap">{formatToIST(scrap.timestamp || scrap.time || '-')}</TableCell>
+                        <TableCell className={cn("text-muted-foreground whitespace-nowrap", highlightedCol === 8 && "bg-yellow-50")}>{formatToIST(scrap.timestamp || scrap.time || '-')}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {usageDetailModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="p-4 border-b flex justify-between items-center bg-gray-50">
+              <div className="flex items-center gap-4">
+                <h2 className="text-lg font-semibold">
+                  Usage & Scrap Summary - {format(usageDetailModal.date, 'PPP')}
+                  <span className="text-muted-foreground ml-2 text-sm">
+                    ({usageDetailModal.type.replace('_', ' & ')})
+                  </span>
+                </h2>
+                <Button variant="outline" size="sm" onClick={() => copyModalAsPicture(usageModalRef, `Usage_Details_${format(usageDetailModal.date, 'yyyyMMdd')}`)}>
+                  {modalCopied ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <ImageIcon className="h-4 w-4 mr-2" />}
+                  {modalCopied ? 'Copied!' : 'Copy Picture'}
+                </Button>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setUsageDetailModal(null)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="p-4 overflow-auto flex-1" ref={usageModalRef}>
+              <Table className="border">
+                <TableHeader>
+                  <TableRow className="bg-gray-50">
+                    <TableHead className="font-bold border">Shift</TableHead>
+                    <TableHead className="font-bold border text-center">Usage Weight (kg)</TableHead>
+                    <TableHead className="font-bold border text-center">Scrap Weight (kg)</TableHead>
+                    <TableHead className="font-bold border text-center">Scrap Rate (%)</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {['A', 'B', 'C', 'A1', 'C1'].map((shift) => {
+                    const formattedDate = format(usageDetailModal.date, 'yyyy-MM-dd');
+                    const shiftSummary = data?.summaries?.find((s: any) => s.date === formattedDate && s.shift === shift);
+                    const dayScraps = data?.scraps?.filter((s: any) => s.date === formattedDate && s.shift === shift) || [];
+                    
+                    let usage = 0;
+                    if (usageDetailModal.type === 'BIC') usage = Number(shiftSummary?.bicUsage || 0);
+                    else if (usageDetailModal.type === 'PLY_CHAFER') usage = Number(shiftSummary?.plyUsage || 0);
+                    else if (usageDetailModal.type === 'RUBBER_MIXING') usage = Number(shiftSummary?.mixingRubberUsage || shiftSummary?.rubberUsage || 0);
+                    else if (usageDetailModal.type === 'RN') usage = Number(shiftSummary?.extrusionRubberUsage || 0);
+
+                    let scrap = 0;
+                    let filteredScraps = [];
+                    if (usageDetailModal.type === 'BIC') filteredScraps = dayScraps.filter((s: any) => s.material === 'BIC');
+                    else if (usageDetailModal.type === 'PLY_CHAFER') filteredScraps = dayScraps.filter((s: any) => (s.material === 'PLY' || s.material === 'Chafer') && (s.section === 'Calendering' || s.section === 'Cutting'));
+                    else if (usageDetailModal.type === 'RUBBER_MIXING') filteredScraps = dayScraps.filter((s: any) => s.material === 'Rubber' && s.section === 'Mixing');
+                    else if (usageDetailModal.type === 'RN') filteredScraps = dayScraps.filter((s: any) => s.material === 'Extrusion Rubber' || s.material === 'RN');
+                    
+                    scrap = filteredScraps.reduce((sum: number, s: any) => sum + Number(s.weight || 0), 0);
+                    const rate = usage > 0 ? ((scrap / usage) * 100).toFixed(3) + '%' : '0%';
+
+                    return (
+                      <TableRow key={shift}>
+                        <TableCell className="font-bold border">{shift}</TableCell>
+                        <TableCell className="text-center border">{usage.toFixed(0)}</TableCell>
+                        <TableCell className="text-center border">{scrap.toFixed(1)}</TableCell>
+                        <TableCell className="text-center border font-medium">{rate}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  <TableRow className="bg-gray-100 font-bold">
+                    <TableCell className="border">TOTAL</TableCell>
+                    {(() => {
+                      const formattedDate = format(usageDetailModal.date, 'yyyy-MM-dd');
+                      const daySummaries = data?.summaries?.filter((s: any) => s.date === formattedDate) || [];
+                      const dayScraps = data?.scraps?.filter((s: any) => s.date === formattedDate) || [];
+                      
+                      let totalUsage = 0;
+                      if (usageDetailModal.type === 'BIC') totalUsage = daySummaries.reduce((sum: number, s: any) => sum + Number(s.bicUsage || 0), 0);
+                      else if (usageDetailModal.type === 'PLY_CHAFER') totalUsage = daySummaries.reduce((sum: number, s: any) => sum + Number(s.plyUsage || 0), 0);
+                      else if (usageDetailModal.type === 'RUBBER_MIXING') totalUsage = daySummaries.reduce((sum: number, s: any) => sum + (Number(s.mixingRubberUsage || 0) || Number(s.rubberUsage || 0)), 0);
+                      else if (usageDetailModal.type === 'RN') totalUsage = daySummaries.reduce((sum: number, s: any) => sum + Number(s.extrusionRubberUsage || 0), 0);
+
+                      let totalScrap = 0;
+                      let filteredScraps = [];
+                      if (usageDetailModal.type === 'BIC') filteredScraps = dayScraps.filter((s: any) => s.material === 'BIC');
+                      else if (usageDetailModal.type === 'PLY_CHAFER') filteredScraps = dayScraps.filter((s: any) => (s.material === 'PLY' || s.material === 'Chafer') && (s.section === 'Calendering' || s.section === 'Cutting'));
+                      else if (usageDetailModal.type === 'RUBBER_MIXING') filteredScraps = dayScraps.filter((s: any) => s.material === 'Rubber' && s.section === 'Mixing');
+                      else if (usageDetailModal.type === 'RN') filteredScraps = dayScraps.filter((s: any) => s.material === 'Extrusion Rubber' || s.material === 'RN');
+                      
+                      totalScrap = filteredScraps.reduce((sum: number, s: any) => sum + Number(s.weight || 0), 0);
+                      const totalRate = totalUsage > 0 ? ((totalScrap / totalUsage) * 100).toFixed(3) + '%' : '0%';
+
+                      return (
+                        <>
+                          <TableCell className="text-center border">{totalUsage.toFixed(0)}</TableCell>
+                          <TableCell className="text-center border">{totalScrap.toFixed(1)}</TableCell>
+                          <TableCell className="text-center border text-primary">{totalRate}</TableCell>
+                        </>
+                      );
+                    })()}
+                  </TableRow>
+                </TableBody>
+              </Table>
             </div>
           </div>
         </div>
@@ -702,10 +795,10 @@ export function MainReport() {
                           step="0.01"
                           className="w-full border rounded px-2 py-1 text-sm"
                           value={target.value}
-                          onChange={(e) => setTargets(prev => ({
-                            ...prev,
-                            [key]: { ...prev[key], value: parseFloat(e.target.value) || 0 }
-                          }))}
+                          onChange={(e) => updateTargets({
+                            ...targets,
+                            [key]: { ...targets[key], value: parseFloat(e.target.value) || 0 }
+                          })}
                         />
                       </div>
                       <div className="w-32">
@@ -713,10 +806,10 @@ export function MainReport() {
                         <select 
                           className="w-full border rounded px-2 py-1 text-sm"
                           value={target.period}
-                          onChange={(e) => setTargets(prev => ({
-                            ...prev,
-                            [key]: { ...prev[key], period: e.target.value as any }
-                          }))}
+                          onChange={(e) => updateTargets({
+                            ...targets,
+                            [key]: { ...targets[key], period: e.target.value as any }
+                          })}
                         >
                           <option value="daily">Daily</option>
                           <option value="weekly">Weekly</option>
