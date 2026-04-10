@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { format, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns';
+import { format, startOfWeek, endOfWeek, eachDayOfInterval, getDate, getDay, startOfMonth, startOfYear, isSameMonth, isSameWeek } from 'date-fns';
 import { Calendar as CalendarIcon, Loader2, RefreshCw, Copy, Image as ImageIcon, Check, X, Type, Plus, Minus } from 'lucide-react';
 import { toBlob } from 'html-to-image';
 import { Calendar } from '@/src/components/ui/calendar';
@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/src/components/ui/pop
 import { Button } from '@/src/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
-import { fetchRangeData, getWebAppUrl } from '@/src/lib/api';
+import { fetchRangeData, fetchTargets, getWebAppUrl } from '@/src/lib/api';
 import { cn } from '@/src/lib/utils';
 import { DateRange } from 'react-day-picker';
 import { useSidebar } from '@/src/lib/SidebarContext';
@@ -36,6 +36,7 @@ export function MainReport() {
     rn_rate: { value: 95, period: 'daily' },
   });
   const [isEditingTargets, setIsEditingTargets] = useState(false);
+  const [isSyncingTargets, setIsSyncingTargets] = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
   const { setControls, sidebarOpen } = useSidebar();
 
@@ -46,13 +47,51 @@ export function MainReport() {
     }));
   };
 
+  const loadTargets = async () => {
+    if (!getWebAppUrl()) return;
+    setIsSyncingTargets(true);
+    try {
+      const targetResult = await fetchTargets();
+      if (targetResult && targetResult.targets) {
+        setTargets(prev => {
+          const newTargets: any = { ...prev };
+          targetResult.targets.forEach((t: any) => {
+            let rowId = '';
+            const cat = String(t.category || '').toLowerCase();
+            if (cat.includes('bic') && cat.includes('scrap')) rowId = 'bic_scrap';
+            else if (cat.includes('ply') && cat.includes('scrap')) rowId = 'ply_scrap';
+            else if (cat.includes('rubber') && cat.includes('scrap')) rowId = 'rubber_scrap';
+            else if (cat.includes('rn') && cat.includes('scrap')) rowId = 'rn_scrap';
+            else if (cat.includes('bic') && cat.includes('rate')) rowId = 'bic_rate';
+            else if (cat.includes('ply') && cat.includes('rate')) rowId = 'ply_rate';
+            else if (cat.includes('rubber') && cat.includes('rate')) rowId = 'rubber_rate';
+            else if (cat.includes('rn') && cat.includes('rate')) rowId = 'rn_rate';
+            
+            if (rowId) {
+              const period = String(t.period || '').toLowerCase();
+              newTargets[rowId] = {
+                value: Number(t.value || 0),
+                period: period === 'not use' ? 'not_use' : (['daily', 'weekly', 'monthly', 'not_use'].includes(period) ? period : 'daily')
+              };
+            }
+          });
+          return newTargets;
+        });
+      }
+    } catch (err) {
+      console.error('Failed to load targets:', err);
+    } finally {
+      setIsSyncingTargets(false);
+    }
+  };
+
   const loadData = async () => {
     if (!getWebAppUrl() || !date?.from || !date?.to) return;
     
     setLoading(true);
     setError('');
     try {
-      const startDate = format(date.from, 'yyyy-MM-dd');
+      const startDate = format(startOfMonth(date.from), 'yyyy-MM-dd');
       const endDate = format(date.to, 'yyyy-MM-dd');
       const result = await fetchRangeData(startDate, endDate);
       setData(result);
@@ -62,6 +101,10 @@ export function MainReport() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadTargets();
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -337,10 +380,52 @@ export function MainReport() {
         if (target.period === 'daily') {
           isOverTarget = value > target.value;
         } else if (target.period === 'weekly' || target.period === 'monthly') {
-          // For weekly/monthly, we might want to check the total or just highlight if daily is high
-          // User said "mixing rubber is for monthly target", let's assume they want to check daily against (monthly/30)
-          const dailyTarget = target.period === 'monthly' ? target.value / 30 : target.value / 7;
-          isOverTarget = value > dailyTarget;
+          // Cumulative logic
+          const targetValue = target.value;
+          let dayNum = 1;
+          let totalDays = 1;
+          let cumulativeScrap = 0;
+          
+          if (target.period === 'monthly') {
+            dayNum = getDate(d);
+            totalDays = 30; // Approximation as per user example
+            
+            // Sum all scraps in the same month up to this day
+            const monthScraps = data?.scraps?.filter((s: any) => {
+              const sDate = new Date(s.date);
+              return isSameMonth(sDate, d) && getDate(sDate) <= dayNum;
+            }) || [];
+            
+            // Filter by material/section
+            let filtered = [];
+            if (type === 'BIC') filtered = monthScraps.filter((s: any) => s.material === 'BIC');
+            else if (type === 'PLY_CHAFER') filtered = monthScraps.filter((s: any) => (s.material === 'PLY' || s.material === 'Chafer') && (s.section === 'Calendering' || s.section === 'Cutting'));
+            else if (type === 'RUBBER_MIXING') filtered = monthScraps.filter((s: any) => s.material === 'Rubber' && s.section === 'Mixing');
+            else if (type === 'RN') filtered = monthScraps.filter((s: any) => s.material === 'Extrusion Rubber' || s.material === 'RN');
+            
+            cumulativeScrap = filtered.reduce((sum: number, s: any) => sum + Number(s.weight || 0), 0);
+          } else {
+            // Weekly
+            dayNum = getDay(d); // 0-6 (Sun-Sat)
+            if (dayNum === 0) dayNum = 7; // Adjust for week starting Mon
+            totalDays = 7;
+            
+            const weekScraps = data?.scraps?.filter((s: any) => {
+              const sDate = new Date(s.date);
+              return isSameWeek(sDate, d, { weekStartsOn: 1 }) && sDate <= d;
+            }) || [];
+            
+            let filtered = [];
+            if (type === 'BIC') filtered = weekScraps.filter((s: any) => s.material === 'BIC');
+            else if (type === 'PLY_CHAFER') filtered = weekScraps.filter((s: any) => (s.material === 'PLY' || s.material === 'Chafer') && (s.section === 'Calendering' || s.section === 'Cutting'));
+            else if (type === 'RUBBER_MIXING') filtered = weekScraps.filter((s: any) => s.material === 'Rubber' && s.section === 'Mixing');
+            else if (type === 'RN') filtered = weekScraps.filter((s: any) => s.material === 'Extrusion Rubber' || s.material === 'RN');
+            
+            cumulativeScrap = filtered.reduce((sum: number, s: any) => sum + Number(s.weight || 0), 0);
+          }
+          
+          const cumulativeTarget = (targetValue / totalDays) * dayNum;
+          isOverTarget = cumulativeScrap > cumulativeTarget;
         }
       }
     } else if (typeof value === 'string') {
@@ -354,6 +439,7 @@ export function MainReport() {
           const numValue = parseFloat(value);
           const target = targets[rowId];
           if (target && target.period !== 'not_use' && target.value > 0 && !isNaN(numValue)) {
+            // For rate, we usually compare the daily rate directly against the target
             // User requested: "In RN rate need to show when it is over than that highlight"
             isOverTarget = numValue > target.value;
           }
@@ -585,7 +671,19 @@ export function MainReport() {
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col overflow-hidden">
             <div className="p-4 border-b flex justify-between items-center bg-gray-50">
-              <h2 className="text-lg font-semibold">Target Settings</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold">Target Settings</h2>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className={cn("h-8 w-8", isSyncingTargets && "animate-spin")}
+                  onClick={loadTargets}
+                  disabled={isSyncingTargets}
+                  title="Sync from Google Sheet"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              </div>
               <Button variant="ghost" size="icon" onClick={() => setIsEditingTargets(false)}>
                 <X className="h-4 w-4" />
               </Button>
