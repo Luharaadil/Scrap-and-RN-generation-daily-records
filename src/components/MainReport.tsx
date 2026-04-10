@@ -23,7 +23,8 @@ export function MainReport() {
   const [copiedImage, setCopiedImage] = useState(false);
   const [detailModal, setDetailModal] = useState<{date: Date, type: 'BIC' | 'PLY_CHAFER' | 'RUBBER_MIXING' | 'RN'} | null>(null);
   const [usageDetailModal, setUsageDetailModal] = useState<{date: Date, type: 'BIC' | 'PLY_CHAFER' | 'RUBBER_MIXING' | 'RN'} | null>(null);
-  const [highlightedCol, setHighlightedCol] = useState<number | null>(null);
+  const [highlightedCols, setHighlightedCols] = useState<number[]>([]);
+  const [highlightedRows, setHighlightedRows] = useState<number[]>([]);
   const [modalCopied, setModalCopied] = useState(false);
   const [isEditingFont, setIsEditingFont] = useState(false);
   const [rowFontSizes, setRowFontSizes] = useState<Record<string, number>>({});
@@ -606,7 +607,7 @@ export function MainReport() {
                   {modalCopied ? 'Copied!' : 'Copy Picture'}
                 </Button>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => { setDetailModal(null); setHighlightedCol(null); }}>
+              <Button variant="ghost" size="icon" onClick={() => { setDetailModal(null); setHighlightedCols([]); setHighlightedRows([]); }}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -622,8 +623,8 @@ export function MainReport() {
                       {['Date', 'Shift', 'Section', 'Material Type', 'Material Name', 'Weight (kg)', 'Reason', 'Picture', 'Recorded At'].map((head, idx) => (
                         <TableHead 
                           key={idx} 
-                          className={cn("cursor-pointer hover:bg-gray-100 transition-colors", highlightedCol === idx && "bg-yellow-100 text-yellow-900 font-bold")}
-                          onClick={() => setHighlightedCol(idx)}
+                          className={cn("cursor-pointer hover:bg-gray-100 transition-colors", highlightedCols.includes(idx) && "bg-yellow-100 text-yellow-900 font-bold")}
+                          onClick={() => setHighlightedCols(prev => prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx])}
                         >
                           {head}
                         </TableHead>
@@ -632,15 +633,19 @@ export function MainReport() {
                   </TableHeader>
                   <TableBody>
                     {getFilteredScrapsForModal().map((scrap: any, i: number) => (
-                      <TableRow key={i}>
-                        <TableCell className={cn("whitespace-nowrap", highlightedCol === 0 && "bg-yellow-50")}>{scrap.date}</TableCell>
-                        <TableCell className={cn(highlightedCol === 1 && "bg-yellow-50")}>{scrap.shift}</TableCell>
-                        <TableCell className={cn(highlightedCol === 2 && "bg-yellow-50")}>{scrap.section}</TableCell>
-                        <TableCell className={cn("font-medium", highlightedCol === 3 && "bg-yellow-50")}>{scrap.material}</TableCell>
-                        <TableCell className={cn(highlightedCol === 4 && "bg-yellow-50")}>{scrap.materialName || '-'}</TableCell>
-                        <TableCell className={cn(highlightedCol === 5 && "bg-yellow-50")}>{typeof scrap.weight === 'number' ? (scrap.weight === 0 ? '0' : scrap.weight.toFixed(1)) : (scrap.weight || '0')}</TableCell>
-                        <TableCell className={cn(highlightedCol === 6 && "bg-yellow-50")}>{scrap.reason}</TableCell>
-                        <TableCell className={cn(highlightedCol === 7 && "bg-yellow-50")}>
+                      <TableRow 
+                        key={i} 
+                        className={cn("cursor-pointer hover:bg-gray-50 transition-colors", highlightedRows.includes(i) && "bg-yellow-100")}
+                        onClick={() => setHighlightedRows(prev => prev.includes(i) ? prev.filter(idx => idx !== i) : [...prev, i])}
+                      >
+                        <TableCell className={cn("whitespace-nowrap", highlightedCols.includes(0) && "bg-yellow-50")}>{scrap.date}</TableCell>
+                        <TableCell className={cn(highlightedCols.includes(1) && "bg-yellow-50")}>{scrap.shift}</TableCell>
+                        <TableCell className={cn(highlightedCols.includes(2) && "bg-yellow-50")}>{scrap.section}</TableCell>
+                        <TableCell className={cn("font-medium", highlightedCols.includes(3) && "bg-yellow-50")}>{scrap.material}</TableCell>
+                        <TableCell className={cn(highlightedCols.includes(4) && "bg-yellow-50")}>{scrap.materialName || '-'}</TableCell>
+                        <TableCell className={cn(highlightedCols.includes(5) && "bg-yellow-50")}>{typeof scrap.weight === 'number' ? (scrap.weight === 0 ? '0' : scrap.weight.toFixed(1)) : (scrap.weight || '0')}</TableCell>
+                        <TableCell className={cn(highlightedCols.includes(6) && "bg-yellow-50")}>{scrap.reason}</TableCell>
+                        <TableCell className={cn(highlightedCols.includes(7) && "bg-yellow-50")}>
                           {scrap.imageUrl ? (
                             <a href={scrap.imageUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
                               View Image
@@ -649,7 +654,7 @@ export function MainReport() {
                             <span className="text-muted-foreground text-sm">No image</span>
                           )}
                         </TableCell>
-                        <TableCell className={cn("text-muted-foreground whitespace-nowrap", highlightedCol === 8 && "bg-yellow-50")}>{formatToIST(scrap.timestamp || scrap.time || '-')}</TableCell>
+                        <TableCell className={cn("text-muted-foreground whitespace-nowrap", highlightedCols.includes(8) && "bg-yellow-50")}>{formatToIST(scrap.timestamp || scrap.time || '-')}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
