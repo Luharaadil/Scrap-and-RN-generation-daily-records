@@ -43,39 +43,26 @@ export function MainReport() {
 
   useEffect(() => {
     setControls(
-      <div className="space-y-4">
-        <div className="space-y-2">
-          {sidebarOpen && <label className="text-xs font-bold text-gray-500">Date Range</label>}
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           <Popover>
             <PopoverTrigger asChild>
-              <Button
-                id="date"
-                variant={"outline"}
-                className={cn(
-                  "w-full justify-start text-left font-normal",
-                  !date && "text-muted-foreground",
-                  !sidebarOpen && "justify-center px-0"
-                )}
-                title={date?.from ? `${format(date.from, "LLL dd, y")} - ${date.to ? format(date.to, "LLL dd, y") : ""}` : "Pick a date range"}
-              >
-                <CalendarIcon className={cn("h-4 w-4", sidebarOpen && "mr-2")} />
-                {sidebarOpen && (
-                  date?.from ? (
-                    date.to ? (
-                      <>
-                        {format(date.from, "LLL dd, y")} -{" "}
-                        {format(date.to, "LLL dd, y")}
-                      </>
-                    ) : (
-                      format(date.from, "LLL dd, y")
-                    )
+              <Button variant="outline" size="sm" className="h-10 font-bold">
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {date?.from ? (
+                  date.to ? (
+                    <>
+                      {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}
+                    </>
                   ) : (
-                    <span>Pick a date range</span>
+                    format(date.from, "LLL dd, y")
                   )
+                ) : (
+                  <span>Pick a date range</span>
                 )}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
+            <PopoverContent className="w-auto p-0" align="end">
               <Calendar
                 initialFocus
                 mode="range"
@@ -88,41 +75,34 @@ export function MainReport() {
           </Popover>
         </div>
 
-        <div className="space-y-2">
-          {sidebarOpen && <label className="text-xs font-bold text-gray-500">Actions</label>}
-          <div className={cn("grid gap-2", sidebarOpen ? "grid-cols-2" : "grid-cols-1")}>
-            <Button variant="outline" size={sidebarOpen ? "square-lg" : "icon"} onClick={copyValuesOnly} title="Copy values only (for Excel)" className={cn(!sidebarOpen && "size-20 flex-col gap-1 text-[8px] uppercase font-bold")}>
-              {copiedText ? <Check className={cn(sidebarOpen ? "h-6 w-6" : "h-5 w-5", "text-green-600")} /> : <Copy className={sidebarOpen ? "h-6 w-6" : "h-5 w-5"} />}
-              {!sidebarOpen && <span>Values</span>}
-              {sidebarOpen && <span>Values</span>}
-            </Button>
-            <Button variant="outline" size={sidebarOpen ? "square-lg" : "icon"} onClick={copyAsPicture} title="Copy table as picture" className={cn(!sidebarOpen && "size-20 flex-col gap-1 text-[8px] uppercase font-bold")}>
-              {copiedImage ? <Check className={cn(sidebarOpen ? "h-6 w-6" : "h-5 w-5", "text-green-600")} /> : <ImageIcon className={sidebarOpen ? "h-6 w-6" : "h-5 w-5"} />}
-              {!sidebarOpen && <span>Picture</span>}
-              {sidebarOpen && <span>Picture</span>}
-            </Button>
-            <Button variant="outline" size={sidebarOpen ? "square-lg" : "icon"} onClick={loadData} disabled={loading} className={cn(sidebarOpen ? "col-span-2 w-full h-16" : "size-20 flex-col gap-1 text-[8px] uppercase font-bold")}>
-              <RefreshCw className={cn(sidebarOpen ? "h-6 w-6" : "h-5 w-5", loading && "animate-spin")} />
-              {!sidebarOpen && <span>Reload</span>}
-              {sidebarOpen && <span>Reload Data</span>}
-            </Button>
-            <Button 
-              variant={isEditingFont ? "default" : "outline"} 
-              size={sidebarOpen ? "square-lg" : "icon"} 
-              onClick={() => setIsEditingFont(!isEditingFont)} 
-              title="Edit row font sizes" 
-              className={cn(sidebarOpen ? "col-span-2 w-full h-16" : "size-20 flex-col gap-1 text-[8px] uppercase font-bold")}
-            >
-              <Type className={sidebarOpen ? "h-6 w-6" : "h-5 w-5"} />
-              {!sidebarOpen && <span>Font</span>}
-              {sidebarOpen && <span>Edit Font</span>}
-            </Button>
-          </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={copyValuesOnly} title="Copy values only (for Excel)" className="h-10 font-bold">
+            {copiedText ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <Copy className="h-4 w-4 mr-2" />}
+            Values
+          </Button>
+          <Button variant="outline" size="sm" onClick={copyAsPicture} title="Copy table as picture" className="h-10 font-bold">
+            {copiedImage ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <ImageIcon className="h-4 w-4 mr-2" />}
+            Picture
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => loadData(true)} disabled={loading} className="h-10 font-bold">
+            <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
+            Reload
+          </Button>
+          <Button 
+            variant={isEditingFont ? "default" : "outline"} 
+            size="sm" 
+            onClick={() => setIsEditingFont(!isEditingFont)} 
+            title="Edit row font sizes" 
+            className="h-10 font-bold"
+          >
+            <Type className="h-4 w-4 mr-2" />
+            Font
+          </Button>
         </div>
       </div>
     );
     return () => setControls(null);
-  }, [date, loading, copiedText, copiedImage, sidebarOpen, isEditingFont]);
+  }, [date, loading, copiedText, copiedImage, isEditingFont]);
 
   const days = date?.from && date?.to 
     ? eachDayOfInterval({ start: date.from, end: date.to }) 

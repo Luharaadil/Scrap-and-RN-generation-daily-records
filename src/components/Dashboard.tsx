@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Loader2, RefreshCw } from 'lucide-react';
+import { Calendar as CalendarIcon, Loader2, RefreshCw, ImageIcon, Check } from 'lucide-react';
 import { Calendar } from '@/src/components/ui/calendar';
+import { toBlob } from 'html-to-image';
 import { Popover, PopoverContent, PopoverTrigger } from '@/src/components/ui/popover';
 import { Button } from '@/src/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src/components/ui/card';
@@ -17,6 +18,49 @@ export function Dashboard() {
   
   const [shiftFilter, setShiftFilter] = useState('All');
   const [sectionFilter, setSectionFilter] = useState('All');
+  const [copiedSummary, setCopiedSummary] = useState(false);
+  const [copiedScrap, setCopiedScrap] = useState(false);
+  
+  const summaryRef = useRef<HTMLDivElement>(null);
+  const scrapTableRef = useRef<HTMLDivElement>(null);
+
+  const copyAsPicture = async (ref: React.RefObject<HTMLDivElement>, setCopied: (v: boolean) => void) => {
+    if (!ref.current) return;
+    try {
+      // Temporarily remove constraints for full capture
+      const originalStyle = ref.current.getAttribute('style') || '';
+      const originalParentStyle = ref.current.parentElement?.getAttribute('style') || '';
+      
+      ref.current.style.width = 'max-content';
+      ref.current.style.height = 'auto';
+      ref.current.style.overflow = 'visible';
+      if (ref.current.parentElement) {
+        ref.current.parentElement.style.overflow = 'visible';
+      }
+
+      const blob = await toBlob(ref.current, { 
+        backgroundColor: '#ffffff',
+        pixelRatio: 2,
+        style: {
+          transform: 'scale(1)',
+          transformOrigin: 'top left'
+        }
+      });
+
+      // Restore styles
+      ref.current.setAttribute('style', originalStyle);
+      if (ref.current.parentElement) {
+        ref.current.parentElement.setAttribute('style', originalParentStyle);
+      }
+
+      if (!blob) return;
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy picture', err);
+    }
+  };
 
   const rawSummary = data?.summaries?.filter((s: any) => s.date === format(date, 'yyyy-MM-dd')) || [];
   
@@ -157,7 +201,14 @@ export function Dashboard() {
         <div className="text-red-500 text-sm font-medium">{error}</div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5" ref={summaryRef}>
+        <div className="md:col-span-2 lg:col-span-3 xl:col-span-5 flex justify-between items-center mb-2">
+          <h2 className="text-xl font-bold">Daily Summary Details</h2>
+          <Button variant="outline" size="sm" onClick={() => copyAsPicture(summaryRef, setCopiedSummary)}>
+            {copiedSummary ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <ImageIcon className="h-4 w-4 mr-2" />}
+            {copiedSummary ? 'Copied!' : 'Copy Summary Image'}
+          </Button>
+        </div>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-lg">BIC (鋼絲)</CardTitle>
@@ -248,11 +299,17 @@ export function Dashboard() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Scrap Details</CardTitle>
-          <CardDescription>Detailed list of scrap recorded for {format(date, 'PPP')}</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <div>
+            <CardTitle>Scrap Details</CardTitle>
+            <CardDescription>Detailed list of scrap recorded for {format(date, 'PPP')}</CardDescription>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => copyAsPicture(scrapTableRef, setCopiedScrap)}>
+            {copiedScrap ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <ImageIcon className="h-4 w-4 mr-2" />}
+            {copiedScrap ? 'Copied!' : 'Copy Scrap Image'}
+          </Button>
         </CardHeader>
-        <CardContent>
+        <CardContent ref={scrapTableRef}>
           {filteredScraps.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No scrap records found matching the current filters.
