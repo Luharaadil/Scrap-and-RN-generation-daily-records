@@ -32,20 +32,6 @@ export const fetchRangeData = async (startDate: string, endDate: string) => {
   }
 };
 
-export const fetchTargets = async () => {
-  try {
-    const response = await fetch(`${WEB_APP_URL}?action=getTargets`);
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Network response was not ok: ${response.status} ${errorText}`);
-    }
-    return response.json();
-  } catch (error) {
-    console.error('Fetch targets failed:', error);
-    throw error;
-  }
-};
-
 export const saveProductionSummary = async (data: any) => {
   const response = await fetch(WEB_APP_URL, {
     method: 'POST',
