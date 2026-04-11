@@ -96,15 +96,24 @@ export function RNReport() {
     
     const extrusionUsage = parseFloat(summary?.extrusionRubberUsage) || 0;
     const tireBuildingUsage = parseFloat(summary?.tireBuildingUsage) || 0;
+    // Point 1: Usage includes both extrusion rubber and tire building
     const usage = extrusionUsage + tireBuildingUsage;
 
-    const extrusionScrap = scraps.filter((s: any) => s.material === 'Extrusion Rubber' || s.material === 'RN')
-                                 .reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
-    const tireBuildingScrap = scraps.filter((s: any) => s.material === 'Rubber' && s.section === 'Tire building')
-                                    .reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
+    // Point 4: Ensure Tire Building RN is correctly identified
+    const extrusionScrap = scraps.filter((s: any) => 
+      (s.material === 'Extrusion Rubber' || s.material === 'RN') && 
+      (s.section === 'Extrusion' || !s.section || s.section === 'Mixing')
+    ).reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
+
+    const tireBuildingScrap = scraps.filter((s: any) => 
+      (s.material === 'Rubber' || s.material === 'RN') && 
+      s.section === 'Tire building'
+    ).reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
+
     const rn = extrusionScrap + tireBuildingScrap;
     
-    const rate = usage > 0 ? ((rn / usage) * 100).toFixed(3) + '%' : '0%';
+    // Point 2: RN ratio = (Extrusion gen + Tire building gen) / Extrusion usage
+    const rate = extrusionUsage > 0 ? ((rn / extrusionUsage) * 100).toFixed(3) + '%' : '0%';
     
     return { usage, rn, rate, extrusionUsage, tireBuildingUsage, extrusionScrap, tireBuildingScrap };
   }, [data]);
@@ -118,13 +127,19 @@ export function RNReport() {
     const tireBuildingUsage = daySummaries.reduce((sum: number, s: any) => sum + (parseFloat(s.tireBuildingUsage) || 0), 0);
     const usage = extrusionUsage + tireBuildingUsage;
 
-    const extrusionScrap = dayScraps.filter((s: any) => s.material === 'Extrusion Rubber' || s.material === 'RN')
-                                    .reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
-    const tireBuildingScrap = dayScraps.filter((s: any) => s.material === 'Rubber' && s.section === 'Tire building')
-                                       .reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
+    const extrusionScrap = dayScraps.filter((s: any) => 
+      (s.material === 'Extrusion Rubber' || s.material === 'RN') && 
+      (s.section === 'Extrusion' || !s.section || s.section === 'Mixing')
+    ).reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
+
+    const tireBuildingScrap = dayScraps.filter((s: any) => 
+      (s.material === 'Rubber' || s.material === 'RN') && 
+      s.section === 'Tire building'
+    ).reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
+
     const rn = extrusionScrap + tireBuildingScrap;
     
-    const rate = usage > 0 ? ((rn / usage) * 100).toFixed(3) + '%' : '0%';
+    const rate = extrusionUsage > 0 ? ((rn / extrusionUsage) * 100).toFixed(3) + '%' : '0%';
     
     return { usage, rn, rate, extrusionUsage, tireBuildingUsage, extrusionScrap, tireBuildingScrap };
   }, [data]);
@@ -541,16 +556,15 @@ export function RNReport() {
             </div>
             <div className="p-4 overflow-auto flex-1" ref={scrapModalRef}>
               <div className="mb-8">
-                <h3 className="text-md font-bold mb-3 px-1">Usage & Scrap Summary</h3>
+                <h3 className="text-md font-bold mb-3 px-1">Usage & RN Summary</h3>
                 <Table className="border mb-6">
                   <TableHeader>
                     <TableRow className="bg-gray-50">
                       <TableHead className="font-bold border">Shift</TableHead>
                       <TableHead className="font-bold border text-center">Extrusion Usage (kg)</TableHead>
-                      <TableHead className="font-bold border text-center">Tire Building Usage (kg)</TableHead>
-                      <TableHead className="font-bold border text-center">Extrusion Scrap (kg)</TableHead>
-                      <TableHead className="font-bold border text-center">Tire Building Scrap (kg)</TableHead>
-                      <TableHead className="font-bold border text-center">Scrap Rate (%)</TableHead>
+                      <TableHead className="font-bold border text-center">Extrusion RN (kg)</TableHead>
+                      <TableHead className="font-bold border text-center">Tire Building RN (kg)</TableHead>
+                      <TableHead className="font-bold border text-center">RN Rate (%)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -560,7 +574,6 @@ export function RNReport() {
                         <TableRow key={shift}>
                           <TableCell className="font-bold border">{shift}</TableCell>
                           <TableCell className="text-center border">{s.extrusionUsage.toFixed(0)}</TableCell>
-                          <TableCell className="text-center border">{s.tireBuildingUsage.toFixed(0)}</TableCell>
                           <TableCell className="text-center border">{s.extrusionScrap.toFixed(1)}</TableCell>
                           <TableCell className="text-center border">{s.tireBuildingScrap.toFixed(1)}</TableCell>
                           <TableCell className="text-center border font-medium">{s.rate}</TableCell>
@@ -575,7 +588,6 @@ export function RNReport() {
                           return (
                             <>
                               <TableCell className="text-center border">{s.extrusionUsage.toFixed(0)}</TableCell>
-                              <TableCell className="text-center border">{s.tireBuildingUsage.toFixed(0)}</TableCell>
                               <TableCell className="text-center border">{s.extrusionScrap.toFixed(1)}</TableCell>
                               <TableCell className="text-center border">{s.tireBuildingScrap.toFixed(1)}</TableCell>
                               <TableCell className="text-center border text-primary">{s.rate}</TableCell>
@@ -588,7 +600,7 @@ export function RNReport() {
                 </Table>
               </div>
 
-              <h3 className="text-md font-bold mb-3 px-1">Detailed Scrap Records</h3>
+              <h3 className="text-md font-bold mb-3 px-1">Detailed RN Records</h3>
               {getFilteredScrapsForModal().length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   No RN records found for this selection.
@@ -603,7 +615,7 @@ export function RNReport() {
                           className={cn("cursor-pointer hover:bg-gray-100 transition-colors", highlightedCols.includes(idx) && "bg-yellow-100 text-yellow-900 font-bold")}
                           onClick={() => setHighlightedCols(prev => prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx])}
                         >
-                          {head}
+                          {head === 'Reason' ? 'Reason for RN' : head}
                         </TableHead>
                       ))}
                     </TableRow>
