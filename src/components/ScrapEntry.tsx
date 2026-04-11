@@ -10,14 +10,14 @@ import { Label } from '@/src/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/components/ui/select';
 import { saveScrapDetails } from '@/src/lib/api';
 import { cn } from '@/src/lib/utils';
-import { useSidebar } from '@/src/lib/SidebarContext';
+import { useData } from '@/src/lib/DataContext';
 
 export function ScrapEntry() {
   const [date, setDate] = useState<Date>(new Date());
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { setControls, sidebarOpen } = useSidebar();
+  const { loadData } = useData();
   
   const [formData, setFormData] = useState({
     material: '',
@@ -31,55 +31,6 @@ export function ScrapEntry() {
   
   const [image, setImage] = useState<{ base64: string, mimeType: string } | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-
-  useEffect(() => {
-    setControls(
-      <div className="space-y-4">
-        <div className="space-y-2">
-          {sidebarOpen && <label className="text-xs font-bold text-gray-500">Date</label>}
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant={"outline"}
-                className={cn(
-                  "w-full justify-start text-left font-normal",
-                  !date && "text-muted-foreground",
-                  !sidebarOpen && "justify-center px-0"
-                )}
-                title={date ? format(date, "PPP") : "Pick a date"}
-              >
-                <CalendarIcon className={cn("h-4 w-4", sidebarOpen && "mr-2")} />
-                {sidebarOpen && (date ? format(date, "PPP") : <span>Pick a date</span>)}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={date}
-                onSelect={(d) => d && setDate(d)}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-
-        <div className="pt-4">
-          <Button 
-            variant="default" 
-            size={sidebarOpen ? "square-lg" : "icon"} 
-            onClick={() => document.getElementById('submit-scrap')?.click()} 
-            disabled={loading}
-            className={cn(sidebarOpen ? "w-full h-16" : "size-20 flex-col gap-1 text-[8px] uppercase font-bold")}
-          >
-            {loading ? <Loader2 className={cn(sidebarOpen ? "h-6 w-6" : "h-5 w-5", "animate-spin")} /> : <Save className={sidebarOpen ? "h-6 w-6" : "h-5 w-5"} />}
-            {!sidebarOpen && <span>Save</span>}
-            {sidebarOpen && <span>Save Scrap</span>}
-          </Button>
-        </div>
-      </div>
-    );
-    return () => setControls(null);
-  }, [date, loading, formData, image, sidebarOpen]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -142,7 +93,7 @@ export function ScrapEntry() {
     try {
       await saveScrapDetails({
         date: format(date, 'yyyy-MM-dd'),
-        timestamp: format(new Date(), 'dd-MM-yyyy HH:mm:ss'),
+        timestamp: new Date().toISOString(),
         material: formData.material,
         materialName: formData.materialName,
         weight: formData.weight || 0,
@@ -154,6 +105,7 @@ export function ScrapEntry() {
       });
       
       setMessage('Scrap data saved successfully!');
+      loadData(true);
       setFormData({ material: '', materialName: '', weight: '', reason: '', shift: '', section: '', customSection: '' });
       clearImage();
     } catch (err: any) {
@@ -165,12 +117,37 @@ export function ScrapEntry() {
 
   return (
     <Card className="w-full">
-      <CardHeader>
-        <CardTitle>Scrap Entry</CardTitle>
-        <CardDescription>Record scrap details and upload a picture.</CardDescription>
+      <CardHeader className="flex flex-row items-center justify-between pb-2 relative">
+        <div className="flex-1" />
+        <CardTitle className="text-2xl text-center flex-1 whitespace-nowrap">Scrap Entry</CardTitle>
+        <div className="flex items-center gap-2 flex-1 justify-end">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={"outline"}
+                className={cn(
+                  "w-[240px] justify-start text-left font-normal h-10 font-bold",
+                  !date && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {date ? format(date, "PPP") : <span>Pick a date</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={(d) => d && setDate(d)}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
       </CardHeader>
       <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-6 pt-4">
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label>Material Type</Label>
@@ -230,6 +207,8 @@ export function ScrapEntry() {
                   <SelectItem value="Extrusion">Extrusion</SelectItem>
                   <SelectItem value="Calendering">Calendering</SelectItem>
                   <SelectItem value="Cutting">Cutting</SelectItem>
+                  <SelectItem value="Tire building">Tire building</SelectItem>
+                  <SelectItem value="Curing">Curing</SelectItem>
                   <SelectItem value="Manual">Manual key in</SelectItem>
                 </SelectContent>
               </Select>
@@ -278,12 +257,8 @@ export function ScrapEntry() {
           </div>
 
           <div className="space-y-2">
-            <Label>Scrap Picture</Label>
+            <Label>Scrap Picture Preview</Label>
             <div className="flex items-center gap-4">
-              <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} className="h-12">
-                <Upload className="mr-2 h-4 w-4" />
-                Upload Image
-              </Button>
               <input 
                 type="file" 
                 ref={fileInputRef} 
@@ -291,9 +266,9 @@ export function ScrapEntry() {
                 accept="image/*" 
                 className="hidden" 
               />
-              {imagePreview && (
+              {imagePreview ? (
                 <div className="relative">
-                  <img src={imagePreview} alt="Preview" className="h-16 w-16 object-cover rounded-md border" />
+                  <img src={imagePreview} alt="Preview" className="size-20 object-cover rounded-md border" />
                   <button 
                     type="button" 
                     onClick={clearImage}
@@ -301,6 +276,10 @@ export function ScrapEntry() {
                   >
                     <X className="h-3 w-3" />
                   </button>
+                </div>
+              ) : (
+                <div className="size-20 border-2 border-dashed border-gray-200 rounded-md flex items-center justify-center text-gray-400 text-xs text-center p-2">
+                  No image selected
                 </div>
               )}
             </div>
@@ -312,7 +291,23 @@ export function ScrapEntry() {
             </div>
           )}
           
-          <button type="submit" id="submit-scrap" className="hidden" />
+          <div className="pt-4 flex flex-row flex-nowrap justify-center gap-2 sm:gap-4">
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="square-lg" 
+              onClick={() => fileInputRef.current?.click()}
+              className="flex-1 h-20 sm:h-24"
+            >
+              <Upload className="h-4 w-4 sm:h-6 sm:w-6" />
+              <span className="text-[10px] sm:text-sm">Upload Picture</span>
+            </Button>
+
+            <Button type="submit" disabled={loading} size="square-lg" className="flex-1 h-20 sm:h-24">
+              {loading ? <Loader2 className="h-4 w-4 sm:h-6 sm:w-6 animate-spin" /> : <Save className="h-4 w-4 sm:h-6 sm:w-6" />}
+              <span className="text-[10px] sm:text-sm">{loading ? 'Saving...' : 'Save Scrap'}</span>
+            </Button>
+          </div>
         </CardContent>
       </form>
     </Card>

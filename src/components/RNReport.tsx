@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { format, eachDayOfInterval } from 'date-fns';
-import { Calendar as CalendarIcon, RefreshCw, Copy, Image as ImageIcon, Check, Type, Plus, Minus, X } from 'lucide-react';
+import { Calendar as CalendarIcon, RefreshCw, Copy, Image as ImageIcon, Check, Type, Plus, Minus, X, Eye, EyeOff, TrendingUp } from 'lucide-react';
 import { toBlob } from 'html-to-image';
 import { Calendar } from '@/src/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/src/components/ui/popover';
@@ -12,16 +12,25 @@ import { DateRange } from 'react-day-picker';
 import { useSidebar } from '@/src/lib/SidebarContext';
 import { useData } from '@/src/lib/DataContext';
 import { startOfWeek, endOfWeek } from 'date-fns';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+
+const rowDefinitions = [
+  ...['A', 'B', 'C', 'A1', 'C1'].flatMap(shift => [
+    { id: `rn_${shift}_usage`, title: `Shift ${shift} Usage (kg)` },
+    { id: `rn_${shift}_scrap`, title: `Shift ${shift} RN (kg)` },
+    { id: `rn_${shift}_rate`, title: `Shift ${shift} Rate (%)` },
+  ]),
+  { id: 'rn_total_usage', title: 'TOTAL Usage (kg)' },
+  { id: 'rn_total_scrap', title: 'TOTAL RN (kg)' },
+  { id: 'rn_total_rate', title: 'TOTAL Rate (%)' },
+];
 
 export function RNReport() {
-  const { 
-    data, 
-    loading, 
-    error, 
-    loadData,
-    globalDateRange: date,
-    setGlobalDateRange: setDate
-  } = useData();
+  const [date, setDate] = useState<DateRange | undefined>({
+    from: startOfWeek(new Date(), { weekStartsOn: 1 }),
+    to: endOfWeek(new Date(), { weekStartsOn: 1 }),
+  });
+  const { data, loading, error, loadData } = useData();
   const [copiedText, setCopiedText] = useState(false);
   const [copiedImage, setCopiedImage] = useState(false);
   const [isEditingFont, setIsEditingFont] = useState(false);
@@ -33,6 +42,10 @@ export function RNReport() {
     const saved = localStorage.getItem('mri_rn_row_font_sizes');
     return saved ? JSON.parse(saved) : {};
   });
+  const [hiddenRows, setHiddenRows] = useState<string[]>(() => {
+    const saved = localStorage.getItem('mri_rn_hidden_rows');
+    return saved ? JSON.parse(saved) : [];
+  });
   const tableRef = useRef<HTMLDivElement>(null);
   const scrapModalRef = useRef<HTMLDivElement>(null);
   const { setControls } = useSidebar();
@@ -41,106 +54,96 @@ export function RNReport() {
     localStorage.setItem('mri_rn_row_font_sizes', JSON.stringify(rowFontSizes));
   }, [rowFontSizes]);
 
-  const adjustFontSize = (rowId: string, delta: number) => {
+  useEffect(() => {
+    localStorage.setItem('mri_rn_hidden_rows', JSON.stringify(hiddenRows));
+  }, [hiddenRows]);
+
+  const days = useMemo(() => {
+    if (!date?.from) return [];
+    if (!date.to) return [date.from];
+    try {
+      const start = date.from;
+      const end = date.to;
+      if (start > end) return [start];
+      return eachDayOfInterval({ start, end });
+    } catch (e) {
+      console.error("Error calculating days interval:", e);
+      return [date.from];
+    }
+  }, [date]);
+
+  const adjustFontSize = useCallback((rowId: string, delta: number) => {
     setRowFontSizes(prev => ({
       ...prev,
       [rowId]: Math.max(8, (prev[rowId] || 14) + delta)
     }));
-  };
+  }, []);
 
-  useEffect(() => {
-    setControls(
-      <div className="flex items-center gap-1 sm:gap-2 flex-nowrap overflow-x-auto pb-1 no-scrollbar">
-        <div className="flex items-center gap-1">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 px-2 font-bold text-[10px] sm:text-xs whitespace-nowrap">
-                <CalendarIcon className="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
-                {date?.from ? (
-                  date.to ? (
-                    <>
-                      {format(date.from, "MM/dd")} - {format(date.to, "MM/dd")}
-                    </>
-                  ) : (
-                    format(date.from, "MM/dd")
-                  )
-                ) : (
-                  <span>Date</span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                initialFocus
-                mode="range"
-                defaultMonth={date?.from}
-                selected={date}
-                onSelect={setDate}
-                numberOfMonths={1}
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-
-        <div className="flex items-center gap-0.5 sm:gap-1 flex-nowrap">
-          <Button variant="outline" size="sm" onClick={copyValuesOnly} title="Copy values only" className="h-7 px-1.5 sm:h-8 sm:px-2 font-bold text-[9px] sm:text-xs flex-shrink-0">
-            {copiedText ? <Check className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" /> : <Copy className="h-3 w-3 sm:h-4 sm:w-4" />}
-            <span className="hidden lg:inline ml-1">Values</span>
-          </Button>
-          <Button variant="outline" size="sm" onClick={copyAsPicture} title="Copy table as picture" className="h-7 px-1.5 sm:h-8 sm:px-2 font-bold text-[9px] sm:text-xs flex-shrink-0">
-            {copiedImage ? <Check className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" /> : <ImageIcon className="h-3 w-3 sm:h-4 sm:w-4" />}
-            <span className="hidden lg:inline ml-1">Picture</span>
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => loadData(true)} disabled={loading} className="h-7 px-1.5 sm:h-8 sm:px-2 font-bold text-[9px] sm:text-xs flex-shrink-0">
-            <RefreshCw className={cn("h-3 w-3 sm:h-4 sm:w-4", loading && "animate-spin")} />
-            <span className="hidden lg:inline ml-1">Reload</span>
-          </Button>
-          <Button 
-            variant={isEditingFont ? "default" : "outline"} 
-            size="sm" 
-            onClick={() => setIsEditingFont(!isEditingFont)} 
-            className="h-7 px-1.5 sm:h-8 sm:px-2 font-bold text-[9px] sm:text-xs flex-shrink-0"
-          >
-            <Type className="h-3 w-3 sm:h-4 sm:w-4" />
-            <span className="hidden lg:inline ml-1">Font</span>
-          </Button>
-        </div>
-      </div>
+  const toggleRowVisibility = useCallback((rowId: string) => {
+    setHiddenRows(prev => 
+      prev.includes(rowId) ? prev.filter(id => id !== rowId) : [...prev, rowId]
     );
-    return () => setControls(null);
-  }, [date, loading, copiedText, copiedImage, isEditingFont]);
+  }, []);
 
-  const days = date?.from && date?.to 
-    ? eachDayOfInterval({ start: date.from, end: date.to }) 
-    : (date?.from ? [date.from] : []);
+  const showAllRows = useCallback(() => {
+    setHiddenRows([]);
+  }, []);
 
-  const getShiftData = (d: Date, shift: string) => {
+  const getShiftData = useCallback((d: Date, shift: string) => {
     const formattedDate = format(d, 'yyyy-MM-dd');
     const summary = data?.summaries?.find((s: any) => s.date === formattedDate && s.shift === shift);
     const scraps = data?.scraps?.filter((s: any) => s.date === formattedDate && s.shift === shift) || [];
     
-    const usage = Number(summary?.extrusionRubberUsage || 0);
-    const rn = scraps.filter((s: any) => s.material === 'Extrusion Rubber' || s.material === 'RN')
-                     .reduce((sum: number, s: any) => sum + Number(s.weight || 0), 0);
+    const extrusionUsage = parseFloat(summary?.extrusionRubberUsage) || 0;
+    const tireBuildingUsage = parseFloat(summary?.tireBuildingUsage) || 0;
+    const usage = extrusionUsage + tireBuildingUsage;
+
+    const extrusionScrap = scraps.filter((s: any) => s.material === 'Extrusion Rubber' || s.material === 'RN')
+                                 .reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
+    const tireBuildingScrap = scraps.filter((s: any) => s.material === 'Rubber' && s.section === 'Tire building')
+                                    .reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
+    const rn = extrusionScrap + tireBuildingScrap;
+    
     const rate = usage > 0 ? ((rn / usage) * 100).toFixed(3) + '%' : '0%';
     
-    return { usage, rn, rate };
-  };
+    return { usage, rn, rate, extrusionUsage, tireBuildingUsage, extrusionScrap, tireBuildingScrap };
+  }, [data]);
 
-  const getTotalData = (d: Date) => {
+  const getTotalData = useCallback((d: Date) => {
     const formattedDate = format(d, 'yyyy-MM-dd');
     const daySummaries = data?.summaries?.filter((s: any) => s.date === formattedDate) || [];
     const dayScraps = data?.scraps?.filter((s: any) => s.date === formattedDate) || [];
     
-    const usage = daySummaries.reduce((sum: number, s: any) => sum + Number(s.extrusionRubberUsage || 0), 0);
-    const rn = dayScraps.filter((s: any) => s.material === 'Extrusion Rubber' || s.material === 'RN')
-                        .reduce((sum: number, s: any) => sum + Number(s.weight || 0), 0);
+    const extrusionUsage = daySummaries.reduce((sum: number, s: any) => sum + (parseFloat(s.extrusionRubberUsage) || 0), 0);
+    const tireBuildingUsage = daySummaries.reduce((sum: number, s: any) => sum + (parseFloat(s.tireBuildingUsage) || 0), 0);
+    const usage = extrusionUsage + tireBuildingUsage;
+
+    const extrusionScrap = dayScraps.filter((s: any) => s.material === 'Extrusion Rubber' || s.material === 'RN')
+                                    .reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
+    const tireBuildingScrap = dayScraps.filter((s: any) => s.material === 'Rubber' && s.section === 'Tire building')
+                                       .reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
+    const rn = extrusionScrap + tireBuildingScrap;
+    
     const rate = usage > 0 ? ((rn / usage) * 100).toFixed(3) + '%' : '0%';
     
-    return { usage, rn, rate };
-  };
+    return { usage, rn, rate, extrusionUsage, tireBuildingUsage, extrusionScrap, tireBuildingScrap };
+  }, [data]);
 
-  const copyValuesOnly = () => {
+  const chartData = useMemo(() => {
+    if (!days.length) return [];
+    return days.map(d => {
+      const dData = getTotalData(d);
+      const rateVal = parseFloat(dData.rate);
+      return {
+        date: format(d, 'MM/dd'),
+        usage: dData.usage || 0,
+        rn: dData.rn || 0,
+        rate: isNaN(rateVal) ? 0 : rateVal
+      };
+    });
+  }, [days, getTotalData]);
+
+  const copyValuesOnly = useCallback(() => {
     if (!days.length) return;
     const shifts = ['A', 'B', 'C', 'A1', 'C1'];
     let rows = [];
@@ -159,9 +162,9 @@ export function RNReport() {
       setCopiedText(true);
       setTimeout(() => setCopiedText(false), 2000);
     });
-  };
+  }, [days, getShiftData, getTotalData]);
 
-  const copyAsPicture = async () => {
+  const copyAsPicture = useCallback(async () => {
     if (!tableRef.current) return;
     try {
       const blob = await toBlob(tableRef.current, { backgroundColor: '#ffffff', pixelRatio: 2 });
@@ -172,7 +175,76 @@ export function RNReport() {
     } catch (err) {
       console.error('Failed to copy picture', err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setControls(
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-10 font-bold">
+                  <Eye className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">View</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-2" align="end">
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm leading-none mb-3">Toggle Rows</h4>
+                  <div className="max-h-[300px] overflow-y-auto space-y-1 pr-2">
+                    {rowDefinitions.map(row => (
+                      <label key={row.id} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 p-1 rounded">
+                        <input 
+                          type="checkbox" 
+                          checked={!hiddenRows.includes(row.id)} 
+                          onChange={() => toggleRowVisibility(row.id)}
+                          className="rounded border-gray-300"
+                        />
+                        <span className="truncate">{row.title}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {hiddenRows.length > 0 && (
+                    <div className="pt-2 border-t mt-2">
+                      <Button variant="ghost" size="sm" className="w-full text-xs" onClick={showAllRows}>
+                        Show all rows
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+            <Button variant="outline" size="sm" onClick={copyValuesOnly} title="Copy values only" className="h-10 font-bold">
+              {copiedText ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <Copy className="h-4 w-4 mr-2" />}
+              <span className="hidden sm:inline">Values</span>
+            </Button>
+            <Button variant="outline" size="sm" onClick={copyAsPicture} title="Copy table as picture" className="h-10 font-bold">
+              {copiedImage ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <ImageIcon className="h-4 w-4 mr-2" />}
+              <span className="hidden sm:inline">Picture</span>
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => loadData(true)} disabled={loading} className="h-10 font-bold">
+              <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
+              <span className="hidden sm:inline">Reload</span>
+            </Button>
+            <Button 
+              variant={isEditingFont ? "default" : "outline"} 
+              size="sm" 
+              onClick={() => setIsEditingFont(!isEditingFont)} 
+              className="h-10 font-bold"
+            >
+              <Type className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Font</span>
+            </Button>
+          </div>
+        </div>
+      );
+    }, 100);
+    return () => {
+      clearTimeout(timer);
+      setControls(null);
+    };
+  }, [loading, copiedText, copiedImage, isEditingFont, hiddenRows, toggleRowVisibility, showAllRows, copyValuesOnly, copyAsPicture, loadData, setControls]);
 
   const getFilteredScrapsForModal = () => {
     if (!detailModal) return [];
@@ -183,7 +255,11 @@ export function RNReport() {
       dayScraps = dayScraps.filter((s: any) => s.shift === detailModal.shift);
     }
 
-    return dayScraps.filter((s: any) => s.material === 'Extrusion Rubber' || s.material === 'RN');
+    return dayScraps.filter((s: any) => 
+      s.material === 'Extrusion Rubber' || 
+      s.material === 'RN' || 
+      (s.material === 'Rubber' && s.section === 'Tire building')
+    );
   };
 
   const formatToIST = (timestamp: string) => {
@@ -234,12 +310,20 @@ export function RNReport() {
 
   const RowHeader = ({ title, subtitle, rowId }: { title: string, subtitle: string, rowId: string }) => (
     <TableCell 
-      className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal relative"
+      className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal relative group"
       style={{ fontSize: rowFontSizes[rowId] ? `${rowFontSizes[rowId]}px` : undefined }}
     >
-      <div className="text-sm" style={{ fontSize: 'inherit' }}>{title}</div>
-      <div className="text-xs text-gray-500 mt-0.5" style={{ fontSize: rowFontSizes[rowId] ? `${rowFontSizes[rowId] * 0.8}px` : undefined }}>{subtitle}</div>
+      <div className="text-sm pr-6" style={{ fontSize: 'inherit' }}>{title}</div>
+      <div className="text-xs text-gray-500 mt-0.5 pr-6" style={{ fontSize: rowFontSizes[rowId] ? `${rowFontSizes[rowId] * 0.8}px` : undefined }}>{subtitle}</div>
       
+      <button 
+        onClick={() => toggleRowVisibility(rowId)}
+        className="absolute right-1 top-1 text-gray-400 hover:text-gray-700 opacity-0 group-hover:opacity-100 transition-opacity"
+        title="Hide row"
+      >
+        <EyeOff className="h-4 w-4" />
+      </button>
+
       {isEditingFont && (
         <div className="absolute right-1 top-1/2 -translate-y-1/2 flex flex-col gap-1 bg-white/90 backdrop-blur-sm p-1 rounded border shadow-sm z-10">
           <button onClick={() => adjustFontSize(rowId, 1)} className="p-0.5 hover:bg-gray-100 rounded text-primary"><Plus className="h-3 w-3" /></button>
@@ -286,8 +370,39 @@ export function RNReport() {
     <div className="space-y-6">
       <Card className="overflow-hidden">
         <div ref={tableRef} className="bg-white">
-          <CardHeader className="text-center pb-2">
-            <CardTitle className="text-2xl">2026 RN Generation Details Report</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between pb-2 relative">
+            <div className="flex-1" />
+            <CardTitle className="text-2xl text-center flex-1 whitespace-nowrap">2026 RN Generation Details Report</CardTitle>
+            <div className="flex items-center gap-2 flex-1 justify-end">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-10 font-bold">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {date?.from ? (
+                      date.to ? (
+                        <>
+                          {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}
+                        </>
+                      ) : (
+                        format(date.from, "LLL dd, y")
+                      )
+                    ) : (
+                      <span>Pick a date range</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar
+                    initialFocus
+                    mode="range"
+                    defaultMonth={date?.from}
+                    selected={date}
+                    onSelect={setDate}
+                    numberOfMonths={1}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
           </CardHeader>
           <CardContent className="p-0 overflow-x-auto">
             <div className="p-4">
@@ -307,38 +422,99 @@ export function RNReport() {
                 <TableBody>
                   {['A', 'B', 'C', 'A1', 'C1'].map(shift => (
                     <React.Fragment key={shift}>
-                      <TableRow>
-                        <RowHeader title={`Shift ${shift} Usage (kg)`} subtitle={`班次 ${shift} 使用重量`} rowId={`rn_${shift}_usage`} />
-                        {days.map(d => renderCell(d, getShiftData(d, shift).usage, `rn_${shift}_usage`, shift))}
-                      </TableRow>
-                      <TableRow>
-                        <RowHeader title={`Shift ${shift} RN (kg)`} subtitle={`班次 ${shift} RN產生重量`} rowId={`rn_${shift}_scrap`} />
-                        {days.map(d => renderCell(d, getShiftData(d, shift).rn, `rn_${shift}_scrap`, shift))}
-                      </TableRow>
-                      <TableRow className="bg-[#e2f0d9]">
-                        <RowHeader title={`Shift ${shift} Rate (%)`} subtitle={`班次 ${shift} 回收率`} rowId={`rn_${shift}_rate`} />
-                        {days.map(d => renderCell(d, getShiftData(d, shift).rate, `rn_${shift}_rate`, shift))}
-                      </TableRow>
+                      {!hiddenRows.includes(`rn_${shift}_usage`) && (
+                        <TableRow>
+                          <RowHeader title={`Shift ${shift} Usage (kg)`} subtitle={`班次 ${shift} 使用重量`} rowId={`rn_${shift}_usage`} />
+                          {days.map(d => renderCell(d, getShiftData(d, shift).usage, `rn_${shift}_usage`, shift))}
+                        </TableRow>
+                      )}
+                      {!hiddenRows.includes(`rn_${shift}_scrap`) && (
+                        <TableRow>
+                          <RowHeader title={`Shift ${shift} RN (kg)`} subtitle={`班次 ${shift} RN產生重量`} rowId={`rn_${shift}_scrap`} />
+                          {days.map(d => renderCell(d, getShiftData(d, shift).rn, `rn_${shift}_scrap`, shift))}
+                        </TableRow>
+                      )}
+                      {!hiddenRows.includes(`rn_${shift}_rate`) && (
+                        <TableRow className="bg-[#e2f0d9]">
+                          <RowHeader title={`Shift ${shift} Rate (%)`} subtitle={`班次 ${shift} 回收率`} rowId={`rn_${shift}_rate`} />
+                          {days.map(d => renderCell(d, getShiftData(d, shift).rate, `rn_${shift}_rate`, shift))}
+                        </TableRow>
+                      )}
                     </React.Fragment>
                   ))}
-                  <TableRow className="bg-gray-100 font-bold">
-                    <RowHeader title="TOTAL Usage (kg)" subtitle="總使用重量" rowId="rn_total_usage" />
-                    {days.map(d => renderCell(d, getTotalData(d).usage, "rn_total_usage"))}
-                  </TableRow>
-                  <TableRow className="bg-gray-100 font-bold">
-                    <RowHeader title="TOTAL RN (kg)" subtitle="總RN產生重量" rowId="rn_total_scrap" />
-                    {days.map(d => renderCell(d, getTotalData(d).rn, "rn_total_scrap"))}
-                  </TableRow>
-                  <TableRow className="bg-[#ddebf7] font-bold">
-                    <RowHeader title="TOTAL Rate (%)" subtitle="總回收率" rowId="rn_total_rate" />
-                    {days.map(d => renderCell(d, getTotalData(d).rate, "rn_total_rate"))}
-                  </TableRow>
+                  {!hiddenRows.includes("rn_total_usage") && (
+                    <TableRow className="bg-gray-100 font-bold">
+                      <RowHeader title="TOTAL Usage (kg)" subtitle="總使用重量" rowId="rn_total_usage" />
+                      {days.map(d => renderCell(d, getTotalData(d).usage, "rn_total_usage"))}
+                    </TableRow>
+                  )}
+                  {!hiddenRows.includes("rn_total_scrap") && (
+                    <TableRow className="bg-gray-100 font-bold">
+                      <RowHeader title="TOTAL RN (kg)" subtitle="總RN產生重量" rowId="rn_total_scrap" />
+                      {days.map(d => renderCell(d, getTotalData(d).rn, "rn_total_scrap"))}
+                    </TableRow>
+                  )}
+                  {!hiddenRows.includes("rn_total_rate") && (
+                    <TableRow className="bg-[#ddebf7] font-bold">
+                      <RowHeader title="TOTAL Rate (%)" subtitle="總回收率" rowId="rn_total_rate" />
+                      {days.map(d => renderCell(d, getTotalData(d).rate, "rn_total_rate"))}
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </div>
           </CardContent>
         </div>
       </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              Total Usage & RN (kg)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="usage" name="Usage" stroke="#2563eb" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                  <Line type="monotone" dataKey="rn" name="RN" stroke="#dc2626" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-green-600" />
+              Total RN Rate (%)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="date" />
+                  <YAxis unit="%" />
+                  <Tooltip formatter={(value: number) => [`${value.toFixed(3)}%`, 'Rate']} />
+                  <Legend />
+                  <Line type="monotone" dataKey="rate" name="RN Rate" stroke="#16a34a" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {detailModal && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-2 md:p-4 backdrop-blur-sm">
@@ -364,6 +540,55 @@ export function RNReport() {
               </Button>
             </div>
             <div className="p-4 overflow-auto flex-1" ref={scrapModalRef}>
+              <div className="mb-8">
+                <h3 className="text-md font-bold mb-3 px-1">Usage & Scrap Summary</h3>
+                <Table className="border mb-6">
+                  <TableHeader>
+                    <TableRow className="bg-gray-50">
+                      <TableHead className="font-bold border">Shift</TableHead>
+                      <TableHead className="font-bold border text-center">Extrusion Usage (kg)</TableHead>
+                      <TableHead className="font-bold border text-center">Tire Building Usage (kg)</TableHead>
+                      <TableHead className="font-bold border text-center">Extrusion Scrap (kg)</TableHead>
+                      <TableHead className="font-bold border text-center">Tire Building Scrap (kg)</TableHead>
+                      <TableHead className="font-bold border text-center">Scrap Rate (%)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(detailModal.shift ? [detailModal.shift] : ['A', 'B', 'C', 'A1', 'C1']).map((shift) => {
+                      const s = getShiftData(detailModal.date, shift);
+                      return (
+                        <TableRow key={shift}>
+                          <TableCell className="font-bold border">{shift}</TableCell>
+                          <TableCell className="text-center border">{s.extrusionUsage.toFixed(0)}</TableCell>
+                          <TableCell className="text-center border">{s.tireBuildingUsage.toFixed(0)}</TableCell>
+                          <TableCell className="text-center border">{s.extrusionScrap.toFixed(1)}</TableCell>
+                          <TableCell className="text-center border">{s.tireBuildingScrap.toFixed(1)}</TableCell>
+                          <TableCell className="text-center border font-medium">{s.rate}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {!detailModal.shift && (
+                      <TableRow className="bg-gray-100 font-bold">
+                        <TableCell className="border">TOTAL</TableCell>
+                        {(() => {
+                          const s = getTotalData(detailModal.date);
+                          return (
+                            <>
+                              <TableCell className="text-center border">{s.extrusionUsage.toFixed(0)}</TableCell>
+                              <TableCell className="text-center border">{s.tireBuildingUsage.toFixed(0)}</TableCell>
+                              <TableCell className="text-center border">{s.extrusionScrap.toFixed(1)}</TableCell>
+                              <TableCell className="text-center border">{s.tireBuildingScrap.toFixed(1)}</TableCell>
+                              <TableCell className="text-center border text-primary">{s.rate}</TableCell>
+                            </>
+                          );
+                        })()}
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <h3 className="text-md font-bold mb-3 px-1">Detailed Scrap Records</h3>
               {getFilteredScrapsForModal().length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   No RN records found for this selection.
