@@ -82,18 +82,18 @@ export function MainReport() {
           </Popover>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={copyValuesOnly} title="Copy values only (for Excel)" className="h-10 font-bold">
             {copiedText ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <Copy className="h-4 w-4 mr-2" />}
-            Values
+            <span className="hidden sm:inline">Values</span>
           </Button>
           <Button variant="outline" size="sm" onClick={copyAsPicture} title="Copy table as picture" className="h-10 font-bold">
             {copiedImage ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <ImageIcon className="h-4 w-4 mr-2" />}
-            Picture
+            <span className="hidden sm:inline">Picture</span>
           </Button>
           <Button variant="outline" size="sm" onClick={() => loadData(true)} disabled={loading} className="h-10 font-bold">
             <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
-            Reload
+            <span className="hidden sm:inline">Reload</span>
           </Button>
           <Button 
             variant={isEditingFont ? "default" : "outline"} 
@@ -103,7 +103,7 @@ export function MainReport() {
             className="h-10 font-bold"
           >
             <Type className="h-4 w-4 mr-2" />
-            Font
+            <span className="hidden sm:inline">Font</span>
           </Button>
         </div>
       </div>
@@ -477,7 +477,7 @@ export function MainReport() {
       <Card className="overflow-hidden">
         <div ref={tableRef} className="bg-white">
           <CardHeader className="text-center pb-2 relative">
-            <CardTitle className="text-2xl">MRI Production Weekly Report MRI 生產週報</CardTitle>
+            <CardTitle className="text-2xl">2026 MRI Production Weekly Report</CardTitle>
             <Button 
               variant="ghost" 
               size="sm" 

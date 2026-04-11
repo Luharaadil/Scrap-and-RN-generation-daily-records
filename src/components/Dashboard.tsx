@@ -213,11 +213,13 @@ export function Dashboard() {
       )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5" ref={summaryRef}>
-        <div className="md:col-span-2 lg:col-span-3 xl:col-span-5 flex justify-between items-center mb-2">
+        <div className="md:col-span-2 lg:col-span-3 xl:col-span-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
           <h2 className="text-xl font-bold">Daily Summary Details</h2>
-          <Button variant="outline" size="sm" onClick={() => copyAsPicture(summaryRef, setCopiedSummary)}>
-            {copiedSummary ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <ImageIcon className="h-4 w-4 mr-2" />}
-            {copiedSummary ? 'Copied!' : 'Copy Summary Image'}
+          <Button variant="outline" size="sm" onClick={() => copyAsPicture(summaryRef, setCopiedSummary)} className="h-9 font-bold">
+            {copiedSummary ? <Check className="h-4 w-4 sm:mr-2 text-green-600" /> : <ImageIcon className="h-4 w-4 sm:mr-2" />}
+            <span className="hidden sm:inline">{copiedSummary ? 'Copied!' : 'Copy Summary Image'}</span>
+            {!copiedSummary && <span className="sm:hidden">Summary</span>}
+            {copiedSummary && <span className="sm:hidden">Copied</span>}
           </Button>
         </div>
         <Card>
@@ -310,14 +312,16 @@ export function Dashboard() {
       </div>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-2">
           <div>
             <CardTitle>Scrap Details</CardTitle>
             <CardDescription>Detailed list of scrap recorded for {format(date, 'PPP')}</CardDescription>
           </div>
-          <Button variant="outline" size="sm" onClick={() => copyAsPicture(scrapTableRef, setCopiedScrap)}>
-            {copiedScrap ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <ImageIcon className="h-4 w-4 mr-2" />}
-            {copiedScrap ? 'Copied!' : 'Copy Scrap Image'}
+          <Button variant="outline" size="sm" onClick={() => copyAsPicture(scrapTableRef, setCopiedScrap)} className="h-9 font-bold">
+            {copiedScrap ? <Check className="h-4 w-4 sm:mr-2 text-green-600" /> : <ImageIcon className="h-4 w-4 sm:mr-2" />}
+            <span className="hidden sm:inline">{copiedScrap ? 'Copied!' : 'Copy Scrap Image'}</span>
+            {!copiedScrap && <span className="sm:hidden">Scrap</span>}
+            {copiedScrap && <span className="sm:hidden">Copied</span>}
           </Button>
         </CardHeader>
         <CardContent ref={scrapTableRef}>

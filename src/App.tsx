@@ -4,6 +4,7 @@ import { Dashboard } from '@/src/components/Dashboard';
 import { ProductionEntry } from '@/src/components/ProductionEntry';
 import { ScrapEntry } from '@/src/components/ScrapEntry';
 import { MainReport } from '@/src/components/MainReport';
+import { RNReport } from '@/src/components/RNReport';
 import { Button } from '@/src/components/ui/button';
 import { LayoutDashboard, FileText, PlusCircle, AlertCircle, Menu } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
@@ -57,12 +58,20 @@ function AppContent() {
                   <AlertCircle className="h-4 w-4" />
                   <span>Scrap Entry</span>
                 </TabsTrigger>
+                
+                <TabsTrigger 
+                  value="rn" 
+                  className="flex items-center gap-2 px-4 py-2 rounded-md transition-all font-bold data-[state=active]:bg-primary data-[state=active]:text-white"
+                >
+                  <FileText className="h-4 w-4" />
+                  <span>RN Generation</span>
+                </TabsTrigger>
               </TabsList>
             </div>
 
             <div className="flex items-center gap-4">
               {controls && (
-                <div className="hidden lg:flex items-center gap-4">
+                <div className="flex items-center gap-2">
                   {controls}
                 </div>
               )}
@@ -89,6 +98,9 @@ function AppContent() {
                       <TabsTrigger value="scrap" className="w-full justify-start gap-2 px-3 py-2 font-bold">
                         <AlertCircle className="h-4 w-4" /> Scrap Entry
                       </TabsTrigger>
+                      <TabsTrigger value="rn" className="w-full justify-start gap-2 px-3 py-2 font-bold">
+                        <FileText className="h-4 w-4" /> RN Generation
+                      </TabsTrigger>
                     </TabsList>
                   </PopoverContent>
                 </Popover>
@@ -114,6 +126,10 @@ function AppContent() {
             
             <TabsContent value="scrap" className="mt-0 outline-none">
               <ScrapEntry />
+            </TabsContent>
+            
+            <TabsContent value="rn" className="mt-0 outline-none">
+              <RNReport />
             </TabsContent>
           </div>
         </main>
