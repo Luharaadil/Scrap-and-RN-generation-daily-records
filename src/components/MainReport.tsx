@@ -27,12 +27,19 @@ export function MainReport() {
   const [highlightedRows, setHighlightedRows] = useState<number[]>([]);
   const [modalCopied, setModalCopied] = useState(false);
   const [isEditingFont, setIsEditingFont] = useState(false);
-  const [rowFontSizes, setRowFontSizes] = useState<Record<string, number>>({});
+  const [rowFontSizes, setRowFontSizes] = useState<Record<string, number>>(() => {
+    const saved = localStorage.getItem('mri_row_font_sizes');
+    return saved ? JSON.parse(saved) : {};
+  });
   const [isEditingTargets, setIsEditingTargets] = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
   const scrapModalRef = useRef<HTMLDivElement>(null);
   const usageModalRef = useRef<HTMLDivElement>(null);
   const { setControls, sidebarOpen } = useSidebar();
+
+  useEffect(() => {
+    localStorage.setItem('mri_row_font_sizes', JSON.stringify(rowFontSizes));
+  }, [rowFontSizes]);
 
   const adjustFontSize = (rowId: string, delta: number) => {
     setRowFontSizes(prev => ({
@@ -285,9 +292,21 @@ export function MainReport() {
     
     // Check if there is ANY data for this date at all
     const formattedDate = format(d, 'yyyy-MM-dd');
-    const hasAnySummary = data?.summaries?.some((s: any) => s.date === formattedDate);
-    const hasAnyScrap = data?.scraps?.some((s: any) => s.date === formattedDate);
-    const hasData = hasAnySummary || hasAnyScrap;
+    const daySummaries = data?.summaries?.filter((s: any) => s.date === formattedDate) || [];
+    const dayScraps = data?.scraps?.filter((s: any) => s.date === formattedDate) || [];
+    
+    // A day has data if it has scraps OR if any summary field is non-zero
+    const hasAnyScrap = dayScraps.length > 0;
+    const hasAnySummaryValue = daySummaries.some((s: any) => 
+      Number(s.bicUsage || 0) > 0 || 
+      Number(s.plyUsage || 0) > 0 || 
+      Number(s.mixingRubberUsage || 0) > 0 || 
+      Number(s.rubberUsage || 0) > 0 || 
+      Number(s.extrusionRubberUsage || 0) > 0 ||
+      Number(s.chaferUsage || 0) > 0
+    );
+    
+    const hasData = hasAnyScrap || hasAnySummaryValue;
 
     if (!hasData) {
       displayValue = '';
@@ -572,22 +591,27 @@ export function MainReport() {
     </Card>
 
       {detailModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-2 md:p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-lg shadow-xl w-[95vw] max-w-[95vw] h-[95vh] max-h-[95vh] flex flex-col overflow-hidden">
             <div className="p-4 border-b flex justify-between items-center bg-gray-50">
-              <div className="flex items-center gap-4">
-                <h2 className="text-lg font-semibold">
+              <div className="flex items-center gap-4 flex-1">
+                <h2 className="text-lg font-semibold flex-1">
                   Scrap Details - {format(detailModal.date, 'PPP')} 
                   <span className="text-muted-foreground ml-2 text-sm">
                     ({detailModal.type.replace('_', ' & ')})
                   </span>
                 </h2>
-                <Button variant="outline" size="sm" onClick={() => copyModalAsPicture(scrapModalRef, `Scrap_Details_${format(detailModal.date, 'yyyyMMdd')}`)}>
-                  {modalCopied ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <ImageIcon className="h-4 w-4 mr-2" />}
-                  {modalCopied ? 'Copied!' : 'Copy Picture'}
-                </Button>
+                <div className="flex items-center gap-4">
+                  <div className="bg-primary/10 text-primary px-3 py-1 rounded-full font-bold text-sm">
+                    Total Weight: {getFilteredScrapsForModal().reduce((sum, s: any) => sum + Number(s.weight || 0), 0).toFixed(1)} kg
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => copyModalAsPicture(scrapModalRef, `Scrap_Details_${format(detailModal.date, 'yyyyMMdd')}`)}>
+                    {modalCopied ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <ImageIcon className="h-4 w-4 mr-2" />}
+                    {modalCopied ? 'Copied!' : 'Copy Picture'}
+                  </Button>
+                </div>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => { setDetailModal(null); setHighlightedCols([]); setHighlightedRows([]); }}>
+              <Button variant="ghost" size="icon" className="ml-4" onClick={() => { setDetailModal(null); setHighlightedCols([]); setHighlightedRows([]); }}>
                 <X className="h-4 w-4" />
               </Button>
             </div>

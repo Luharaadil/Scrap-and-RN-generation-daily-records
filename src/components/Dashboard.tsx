@@ -63,13 +63,25 @@ export function Dashboard() {
   };
 
   const rawSummary = data?.summaries?.filter((s: any) => s.date === format(date, 'yyyy-MM-dd')) || [];
+  const scraps = data?.scraps?.filter((s: any) => s.date === format(date, 'yyyy-MM-dd')) || [];
   
+  // A day has data if it has scraps OR if any summary field is non-zero
+  const hasAnySummaryValue = rawSummary.some((s: any) => 
+    Number(s.bicUsage || 0) > 0 || 
+    Number(s.plyUsage || 0) > 0 || 
+    Number(s.mixingRubberUsage || 0) > 0 || 
+    Number(s.rubberUsage || 0) > 0 || 
+    Number(s.extrusionRubberUsage || 0) > 0 ||
+    Number(s.chaferUsage || 0) > 0
+  );
+  const hasData = scraps.length > 0 || hasAnySummaryValue;
+
   const summary = rawSummary.reduce((acc: any, curr: any) => ({
     bicUsage: (acc.bicUsage || 0) + Number(curr.bicUsage || 0),
     bicScrap: (acc.bicScrap || 0) + Number(curr.bicScrap || 0),
     plyUsage: (acc.plyUsage || 0) + Number(curr.plyUsage || 0),
     plyScrap: (acc.plyScrap || 0) + Number(curr.plyScrap || 0),
-    rubberUsage: (acc.rubberUsage || 0) + Number(curr.rubberUsage || 0),
+    rubberUsage: (acc.rubberUsage || 0) + (Number(curr.mixingRubberUsage || 0) || Number(curr.rubberUsage || 0)),
     rubberScrap: (acc.rubberScrap || 0) + Number(curr.rubberScrap || 0),
     rnScrap: (acc.rnScrap || 0) + Number(curr.rnScrap || 0),
     chaferUsage: (acc.chaferUsage || 0) + Number(curr.chaferUsage || 0),
@@ -79,8 +91,6 @@ export function Dashboard() {
     bicUsage: 0, bicScrap: 0, plyUsage: 0, plyScrap: 0, rubberUsage: 0, rubberScrap: 0, rnScrap: 0, chaferUsage: 0, chaferScrap: 0, extrusionRubberUsage: 0
   });
   
-  const scraps = data?.scraps?.filter((s: any) => s.date === format(date, 'yyyy-MM-dd')) || [];
-
   const filteredScraps = scraps.filter((scrap: any) => {
     if (shiftFilter !== 'All' && scrap.shift !== shiftFilter) return false;
     if (sectionFilter !== 'All' && scrap.section !== sectionFilter) return false;
@@ -105,6 +115,7 @@ export function Dashboard() {
   };
 
   const formatValue = (val: any, unit: string = '') => {
+    if (!hasData) return '';
     if (val === null || val === undefined || val === '') return '';
     const num = Number(val);
     if (num === 0) return '0';
@@ -225,7 +236,7 @@ export function Dashboard() {
               </div>
               <div className="flex justify-between border-t pt-1 mt-1">
                 <span className="text-muted-foreground">Scrap Rate:</span>
-                <span className="font-bold">{calculateRate(displayBicScrap, summary.bicUsage) ?? '0'}</span>
+                <span className="font-bold">{hasData ? (calculateRate(displayBicScrap, summary.bicUsage) ?? '0') : ''}</span>
               </div>
             </div>
           </CardContent>
@@ -247,7 +258,7 @@ export function Dashboard() {
               </div>
               <div className="flex justify-between border-t pt-1 mt-1">
                 <span className="text-muted-foreground">Scrap Rate:</span>
-                <span className="font-bold">{calculateRate(displayPlyScrap, summary.plyUsage) ?? '0'}</span>
+                <span className="font-bold">{hasData ? (calculateRate(displayPlyScrap, summary.plyUsage) ?? '0') : ''}</span>
               </div>
             </div>
           </CardContent>
@@ -269,7 +280,7 @@ export function Dashboard() {
               </div>
               <div className="flex justify-between border-t pt-1 mt-1">
                 <span className="text-muted-foreground">Scrap Rate:</span>
-                <span className="font-bold">{calculateRate(displayRubberScrap, summary.rubberUsage) ?? '0'}</span>
+                <span className="font-bold">{hasData ? (calculateRate(displayRubberScrap, summary.rubberUsage) ?? '0') : ''}</span>
               </div>
             </div>
           </CardContent>
@@ -291,7 +302,7 @@ export function Dashboard() {
               </div>
               <div className="flex justify-between border-t pt-1 mt-1">
                 <span className="text-muted-foreground">Scrap Rate:</span>
-                <span className="font-bold">{calculateRate(displayRnScrap, summary.extrusionRubberUsage) ?? '0'}</span>
+                <span className="font-bold">{hasData ? (calculateRate(displayRnScrap, summary.extrusionRubberUsage) ?? '0') : ''}</span>
               </div>
             </div>
           </CardContent>
