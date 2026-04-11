@@ -13,11 +13,14 @@ import { cn } from '@/src/lib/utils';
 import { useData } from '@/src/lib/DataContext';
 
 export function ScrapEntry() {
-  const [date, setDate] = useState<Date>(new Date());
+  const { 
+    loadData,
+    globalDate: date,
+    setGlobalDate: setDate
+  } = useData();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { loadData } = useData();
   
   const [formData, setFormData] = useState({
     material: '',

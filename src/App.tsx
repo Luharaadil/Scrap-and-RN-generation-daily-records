@@ -20,9 +20,9 @@ function AppContent() {
       <Tabs defaultValue="main" className="flex-1 flex flex-col">
         {/* Top Header */}
         <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
-          <div className="max-w-[1600px] mx-auto px-4 h-20 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-6">
-              <h1 className="font-bold tracking-tight text-gray-900 text-xl whitespace-nowrap">
+          <div className="max-w-[1600px] mx-auto px-2 sm:px-4 h-14 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 sm:gap-6">
+              <h1 className="font-bold tracking-tight text-gray-900 text-sm sm:text-xl whitespace-nowrap">
                 MRI Tracker
               </h1>
               
@@ -69,9 +69,9 @@ function AppContent() {
               </TabsList>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1 sm:gap-2 flex-nowrap min-w-0">
               {controls && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-0.5 sm:gap-1 flex-nowrap">
                   {controls}
                 </div>
               )}

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { format, startOfMonth } from 'date-fns';
+import { format, startOfMonth, startOfWeek, endOfWeek } from 'date-fns';
 import { fetchRangeData, fetchTargets, getWebAppUrl } from './api';
+import { DateRange } from 'react-day-picker';
 
 interface DataContextType {
   data: any;
@@ -11,6 +12,15 @@ interface DataContextType {
   loadTargets: () => Promise<void>;
   updateTargets: (newTargets: any) => void;
   isSyncingTargets: boolean;
+  // Global selections
+  globalDateRange: DateRange | undefined;
+  setGlobalDateRange: (range: DateRange | undefined) => void;
+  globalDate: Date;
+  setGlobalDate: (date: Date) => void;
+  globalShift: string;
+  setGlobalShift: (shift: string) => void;
+  globalSection: string;
+  setGlobalSection: (section: string) => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -31,6 +41,15 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [isSyncingTargets, setIsSyncingTargets] = useState(false);
   const [error, setError] = useState('');
   const [lastFetchRange, setLastFetchRange] = useState<{ start: string, end: string } | null>(null);
+
+  // Global selections
+  const [globalDateRange, setGlobalDateRange] = useState<DateRange | undefined>({
+    from: startOfWeek(new Date(), { weekStartsOn: 1 }),
+    to: endOfWeek(new Date(), { weekStartsOn: 1 }),
+  });
+  const [globalDate, setGlobalDate] = useState<Date>(new Date());
+  const [globalShift, setGlobalShift] = useState('All');
+  const [globalSection, setGlobalSection] = useState('All');
 
   const updateTargets = useCallback((newTargets: any) => {
     setTargets(newTargets);
@@ -105,7 +124,24 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <DataContext.Provider value={{ data, targets, loading, error, loadData, loadTargets, updateTargets, isSyncingTargets }}>
+    <DataContext.Provider value={{ 
+      data, 
+      targets, 
+      loading, 
+      error, 
+      loadData, 
+      loadTargets, 
+      updateTargets, 
+      isSyncingTargets,
+      globalDateRange,
+      setGlobalDateRange,
+      globalDate,
+      setGlobalDate,
+      globalShift,
+      setGlobalShift,
+      globalSection,
+      setGlobalSection
+    }}>
       {children}
     </DataContext.Provider>
   );

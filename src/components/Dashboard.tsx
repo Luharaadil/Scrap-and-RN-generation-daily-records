@@ -13,11 +13,19 @@ import { cn } from '@/src/lib/utils';
 import { useData } from '@/src/lib/DataContext';
 
 export function Dashboard() {
-  const [date, setDate] = useState<Date>(new Date());
-  const { data, loading, error, loadData } = useData();
+  const { 
+    data, 
+    loading, 
+    error, 
+    loadData,
+    globalDate: date,
+    setGlobalDate: setDate,
+    globalShift: shiftFilter,
+    setGlobalShift: setShiftFilter,
+    globalSection: sectionFilter,
+    setGlobalSection: setSectionFilter
+  } = useData();
   
-  const [shiftFilter, setShiftFilter] = useState('All');
-  const [sectionFilter, setSectionFilter] = useState('All');
   const [copiedSummary, setCopiedSummary] = useState(false);
   const [copiedScrap, setCopiedScrap] = useState(false);
   
@@ -150,19 +158,20 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between bg-white p-4 rounded-lg border shadow-sm">
-        <div className="flex flex-wrap gap-3 items-center">
+      <div className="flex flex-col md:flex-row gap-2 items-start md:items-center justify-between bg-white p-2 rounded-lg border shadow-sm overflow-x-auto no-scrollbar">
+        <div className="flex flex-wrap md:flex-nowrap gap-1 items-center">
           <Popover>
             <PopoverTrigger asChild>
               <Button
                 variant={"outline"}
+                size="sm"
                 className={cn(
-                  "w-[240px] justify-start text-left font-normal",
+                  "w-[100px] sm:w-[180px] h-7 sm:h-8 justify-start text-left font-bold text-[9px] sm:text-xs",
                   !date && "text-muted-foreground"
                 )}
               >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {date ? format(date, "PPP") : <span>Pick a date</span>}
+                <CalendarIcon className="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
+                {date ? format(date, "MM/dd/yy") : <span>Date</span>}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -176,7 +185,7 @@ export function Dashboard() {
           </Popover>
 
           <Select value={shiftFilter} onValueChange={setShiftFilter}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-[60px] sm:w-[100px] h-7 sm:h-8 text-[9px] sm:text-xs font-bold">
               <SelectValue placeholder="Shift" />
             </SelectTrigger>
             <SelectContent>
@@ -190,7 +199,7 @@ export function Dashboard() {
           </Select>
 
           <Select value={sectionFilter} onValueChange={setSectionFilter}>
-            <SelectTrigger className="w-[160px]">
+            <SelectTrigger className="w-[80px] sm:w-[120px] h-7 sm:h-8 text-[9px] sm:text-xs font-bold">
               <SelectValue placeholder="Section" />
             </SelectTrigger>
             <SelectContent>
@@ -203,8 +212,8 @@ export function Dashboard() {
           </Select>
         </div>
 
-        <Button variant="outline" size="icon" onClick={() => loadData(true)} disabled={loading}>
-          <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+        <Button variant="outline" size="icon" onClick={() => loadData(true)} disabled={loading} className="h-7 w-7 sm:h-8 sm:w-8">
+          <RefreshCw className={cn("h-3 w-3 sm:h-4 sm:w-4", loading && "animate-spin")} />
         </Button>
       </div>
 

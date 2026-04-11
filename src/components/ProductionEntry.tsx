@@ -65,11 +65,14 @@ function ProductionRow({ label, sectionKey, values, onChange, onSave, loading, i
 }
 
 export function ProductionEntry() {
-  const [date, setDate] = useState<Date>(new Date());
+  const { 
+    loadData,
+    globalDate: date,
+    setGlobalDate: setDate
+  } = useData();
   const [loading, setLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
   const [message, setMessage] = useState('');
-  const { loadData } = useData();
   
   const [formData, setFormData] = useState<Record<string, Record<string, string>>>({
     bicUsage: { A: '', B: '', C: '', A1: '', C1: '' },

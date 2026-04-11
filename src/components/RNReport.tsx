@@ -14,11 +14,14 @@ import { useData } from '@/src/lib/DataContext';
 import { startOfWeek, endOfWeek } from 'date-fns';
 
 export function RNReport() {
-  const [date, setDate] = useState<DateRange | undefined>({
-    from: startOfWeek(new Date(), { weekStartsOn: 1 }),
-    to: endOfWeek(new Date(), { weekStartsOn: 1 }),
-  });
-  const { data, loading, error, loadData } = useData();
+  const { 
+    data, 
+    loading, 
+    error, 
+    loadData,
+    globalDateRange: date,
+    setGlobalDateRange: setDate
+  } = useData();
   const [copiedText, setCopiedText] = useState(false);
   const [copiedImage, setCopiedImage] = useState(false);
   const [isEditingFont, setIsEditingFont] = useState(false);
@@ -47,22 +50,22 @@ export function RNReport() {
 
   useEffect(() => {
     setControls(
-      <div className="flex items-center gap-4 flex-wrap">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 sm:gap-2 flex-nowrap overflow-x-auto pb-1 no-scrollbar">
+        <div className="flex items-center gap-1">
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="h-10 font-bold">
-                <CalendarIcon className="mr-2 h-4 w-4" />
+              <Button variant="outline" size="sm" className="h-8 px-2 font-bold text-[10px] sm:text-xs whitespace-nowrap">
+                <CalendarIcon className="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
                 {date?.from ? (
                   date.to ? (
                     <>
-                      {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}
+                      {format(date.from, "MM/dd")} - {format(date.to, "MM/dd")}
                     </>
                   ) : (
-                    format(date.from, "LLL dd, y")
+                    format(date.from, "MM/dd")
                   )
                 ) : (
-                  <span>Pick a date range</span>
+                  <span>Date</span>
                 )}
               </Button>
             </PopoverTrigger>
@@ -79,27 +82,27 @@ export function RNReport() {
           </Popover>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={copyValuesOnly} title="Copy values only" className="h-10 font-bold">
-            {copiedText ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <Copy className="h-4 w-4 mr-2" />}
-            <span className="hidden sm:inline">Values</span>
+        <div className="flex items-center gap-0.5 sm:gap-1 flex-nowrap">
+          <Button variant="outline" size="sm" onClick={copyValuesOnly} title="Copy values only" className="h-7 px-1.5 sm:h-8 sm:px-2 font-bold text-[9px] sm:text-xs flex-shrink-0">
+            {copiedText ? <Check className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" /> : <Copy className="h-3 w-3 sm:h-4 sm:w-4" />}
+            <span className="hidden lg:inline ml-1">Values</span>
           </Button>
-          <Button variant="outline" size="sm" onClick={copyAsPicture} title="Copy table as picture" className="h-10 font-bold">
-            {copiedImage ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <ImageIcon className="h-4 w-4 mr-2" />}
-            <span className="hidden sm:inline">Picture</span>
+          <Button variant="outline" size="sm" onClick={copyAsPicture} title="Copy table as picture" className="h-7 px-1.5 sm:h-8 sm:px-2 font-bold text-[9px] sm:text-xs flex-shrink-0">
+            {copiedImage ? <Check className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" /> : <ImageIcon className="h-3 w-3 sm:h-4 sm:w-4" />}
+            <span className="hidden lg:inline ml-1">Picture</span>
           </Button>
-          <Button variant="outline" size="sm" onClick={() => loadData(true)} disabled={loading} className="h-10 font-bold">
-            <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
-            <span className="hidden sm:inline">Reload</span>
+          <Button variant="outline" size="sm" onClick={() => loadData(true)} disabled={loading} className="h-7 px-1.5 sm:h-8 sm:px-2 font-bold text-[9px] sm:text-xs flex-shrink-0">
+            <RefreshCw className={cn("h-3 w-3 sm:h-4 sm:w-4", loading && "animate-spin")} />
+            <span className="hidden lg:inline ml-1">Reload</span>
           </Button>
           <Button 
             variant={isEditingFont ? "default" : "outline"} 
             size="sm" 
             onClick={() => setIsEditingFont(!isEditingFont)} 
-            className="h-10 font-bold"
+            className="h-7 px-1.5 sm:h-8 sm:px-2 font-bold text-[9px] sm:text-xs flex-shrink-0"
           >
-            <Type className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">Font</span>
+            <Type className="h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden lg:inline ml-1">Font</span>
           </Button>
         </div>
       </div>
