@@ -87,6 +87,7 @@ export function ProductionEntry() {
       try {
         const formattedDate = format(date, 'yyyy-MM-dd');
         const result = await fetchSummaryAndScraps(formattedDate);
+        console.log("Fetched data for date:", formattedDate, result);
         
         const newFormData: any = {
           bicUsage: { A: '0', B: '0', C: '0', A1: '0', C1: '0' },
@@ -95,26 +96,33 @@ export function ProductionEntry() {
           mixingRubberUsage: { A: '0', B: '0', C: '0', A1: '0', C1: '0' }
         };
 
-        if (result && result.summaries) {
+        if (result && result.summaries && result.summaries.length > 0) {
           result.summaries.forEach((s: any) => {
-            const shift = s.shift;
+            const shift = String(s.shift || '').trim();
             if (newFormData.bicUsage[shift] !== undefined) {
-              // Use existing values if they exist, otherwise keep '0'
-              if (s.bicUsage !== undefined && s.bicUsage !== null) 
+              // Map BIC
+              if (s.bicUsage !== undefined && s.bicUsage !== null && s.bicUsage !== '') 
                 newFormData.bicUsage[shift] = Math.round(Number(s.bicUsage)).toString();
-              if (s.plyUsage !== undefined && s.plyUsage !== null)
+              
+              // Map PLY
+              if (s.plyUsage !== undefined && s.plyUsage !== null && s.plyUsage !== '')
                 newFormData.plyUsage[shift] = Math.round(Number(s.plyUsage)).toString();
-              if (s.extrusionRubberUsage !== undefined && s.extrusionRubberUsage !== null)
-                newFormData.extrusionRubberUsage[shift] = Math.round(Number(s.extrusionRubberUsage)).toString();
-              else if (s.chaferUsage !== undefined && s.chaferUsage !== null)
-                newFormData.extrusionRubberUsage[shift] = Math.round(Number(s.chaferUsage)).toString();
+              
+              // Map Extrusion (handle multiple possible keys)
+              const extVal = s.extrusionRubberUsage ?? s.chaferUsage;
+              if (extVal !== undefined && extVal !== null && extVal !== '')
+                newFormData.extrusionRubberUsage[shift] = Math.round(Number(extVal)).toString();
                 
-              if (s.mixingRubberUsage !== undefined && s.mixingRubberUsage !== null)
-                newFormData.mixingRubberUsage[shift] = Math.round(Number(s.mixingRubberUsage)).toString();
-              else if (s.rubberUsage !== undefined && s.rubberUsage !== null)
-                newFormData.mixingRubberUsage[shift] = Math.round(Number(s.rubberUsage)).toString();
+              // Map Mixing (handle multiple possible keys)
+              const mixVal = s.mixingRubberUsage ?? s.rubberUsage;
+              if (mixVal !== undefined && mixVal !== null && mixVal !== '')
+                newFormData.mixingRubberUsage[shift] = Math.round(Number(mixVal)).toString();
             }
           });
+          setMessage(`Loaded data for ${result.summaries.length} shifts.`);
+        } else {
+          setMessage('No existing data found for this date in the sheet.');
+          console.warn("No summaries found in result:", result);
         }
         setFormData(newFormData);
       } catch (err: any) {
