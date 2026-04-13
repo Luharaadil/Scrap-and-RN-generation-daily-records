@@ -163,7 +163,7 @@ export function ProductionEntry() {
     
     try {
       const shifts = ['A', 'B', 'C', 'A1', 'C1'];
-      const dateStr = format(date, 'dd/MM/yyyy');
+      const dateStr = format(date, 'yyyy-MM-dd');
       
       if (sectionKey === 'All Sections') {
         // Save all shifts for all sections

@@ -30,7 +30,8 @@ export function RNReport() {
     from: startOfWeek(new Date(), { weekStartsOn: 1 }),
     to: endOfWeek(new Date(), { weekStartsOn: 1 }),
   });
-  const { data, loading, error, loadData } = useData();
+  const { data, targets, loading, error, loadData } = useData();
+  const [activeTab, setActiveTab] = useState<'shift' | 'material'>('shift');
   const [copiedText, setCopiedText] = useState(false);
   const [copiedImage, setCopiedImage] = useState(false);
   const [isEditingFont, setIsEditingFont] = useState(false);
@@ -145,6 +146,35 @@ export function RNReport() {
     return { usage, rn, rate, extrusionUsage, tireBuildingUsage, extrusionScrap, tireBuildingScrap };
   }, [data]);
 
+  const getMaterialData = useCallback((d: Date, materialName: string) => {
+    const formattedDate = format(d, 'yyyy-MM-dd');
+    const dayScraps = data?.scraps?.filter((s: any) => s.date === formattedDate && s.materialName === materialName) || [];
+    
+    // For material-wise, we only show RN generation weight
+    const extrusionScrap = dayScraps.filter((s: any) => 
+      (s.material === 'Extrusion Rubber' || s.material === 'RN') && 
+      (s.section === 'Extrusion' || !s.section || s.section === 'Mixing')
+    ).reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
+
+    const tireBuildingScrap = dayScraps.filter((s: any) => 
+      (s.material === 'Rubber' || s.material === 'RN') && 
+      s.section === 'Tire building'
+    ).reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
+
+    return extrusionScrap + tireBuildingScrap;
+  }, [data]);
+
+  const uniqueMaterials = useMemo(() => {
+    if (!data?.scraps) return [];
+    const materials = new Set<string>();
+    data.scraps.forEach((s: any) => {
+      if (s.materialName && (s.material === 'Extrusion Rubber' || s.material === 'RN' || (s.material === 'Rubber' && s.section === 'Tire building'))) {
+        materials.add(s.materialName);
+      }
+    });
+    return Array.from(materials).sort();
+  }, [data]);
+
   const chartData = useMemo(() => {
     if (!days.length) return [];
     return days.map(d => {
@@ -154,21 +184,28 @@ export function RNReport() {
         date: format(d, 'MM/dd'),
         usage: dData.usage || 0,
         rn: dData.rn || 0,
-        rate: isNaN(rateVal) ? 0 : rateVal
+        rate: isNaN(rateVal) ? 0 : rateVal,
+        target: targets?.rn_rate?.value || 95
       };
     });
-  }, [days, getTotalData]);
+  }, [days, getTotalData, targets]);
 
   const copyValuesOnly = useCallback(() => {
     if (!days.length) return;
-    const shifts = ['A', 'B', 'C', 'A1', 'C1'];
     let rows = [];
     
-    shifts.forEach(shift => {
-      rows.push(days.map(d => getShiftData(d, shift).usage).join('\t'));
-      rows.push(days.map(d => getShiftData(d, shift).rn).join('\t'));
-      rows.push(days.map(d => getShiftData(d, shift).rate).join('\t'));
-    });
+    if (activeTab === 'shift') {
+      const shifts = ['A', 'B', 'C', 'A1', 'C1'];
+      shifts.forEach(shift => {
+        rows.push(days.map(d => getShiftData(d, shift).usage).join('\t'));
+        rows.push(days.map(d => getShiftData(d, shift).rn).join('\t'));
+        rows.push(days.map(d => getShiftData(d, shift).rate).join('\t'));
+      });
+    } else {
+      uniqueMaterials.forEach(mat => {
+        rows.push(days.map(d => getMaterialData(d, mat)).join('\t'));
+      });
+    }
     
     rows.push(days.map(d => getTotalData(d).usage).join('\t'));
     rows.push(days.map(d => getTotalData(d).rn).join('\t'));
@@ -178,7 +215,7 @@ export function RNReport() {
       setCopiedText(true);
       setTimeout(() => setCopiedText(false), 2000);
     });
-  }, [days, getShiftData, getTotalData]);
+  }, [days, getShiftData, getTotalData, getMaterialData, activeTab, uniqueMaterials]);
 
   const copyAsPicture = useCallback(async () => {
     if (!tableRef.current) return;
@@ -368,25 +405,31 @@ export function RNReport() {
     </TableCell>
   );
 
-  const renderCell = (d: Date, value: any, rowId: string, shift?: string) => {
+  const renderCell = (d: Date, value: any, rowId: string, shift?: string, materialName?: string) => {
     const formattedDate = format(d, 'yyyy-MM-dd');
     const hasData = data?.summaries?.some((s: any) => s.date === formattedDate) || data?.scraps?.some((s: any) => s.date === formattedDate);
     
     let displayValue = '';
     if (hasData) {
       if (typeof value === 'number') {
-        displayValue = value === 0 ? '0' : (rowId.includes('rate') ? value.toFixed(3) : value.toFixed(0));
+        displayValue = value === 0 ? '0' : (rowId.includes('rate') ? value.toFixed(1) : value.toFixed(0));
       } else {
         displayValue = value || '0';
+        if (rowId.includes('rate') && displayValue.includes('%')) {
+          displayValue = parseFloat(displayValue).toFixed(1) + '%';
+        }
       }
     }
+
+    const isBelowTarget = rowId.includes('rate') && hasData && parseFloat(displayValue) < (targets?.rn_rate?.value || 95);
 
     return (
       <TableCell 
         key={d.toISOString()} 
         className={cn(
           "border border-gray-300 text-center transition-colors",
-          hasData && "cursor-pointer hover:bg-black/5"
+          hasData && "cursor-pointer hover:bg-black/5",
+          isBelowTarget && "text-red-600 font-bold"
         )}
         style={{ fontSize: rowFontSizes[rowId] ? `${rowFontSizes[rowId]}px` : undefined }}
         onDoubleClick={() => {
@@ -405,7 +448,24 @@ export function RNReport() {
       <Card className="overflow-hidden">
         <div ref={tableRef} className="bg-white">
           <CardHeader className="flex flex-row items-center justify-between pb-2 relative">
-            <div className="flex-1" />
+            <div className="flex-1 flex gap-2">
+              <Button 
+                variant={activeTab === 'shift' ? "default" : "outline"} 
+                size="sm" 
+                onClick={() => setActiveTab('shift')}
+                className="font-bold"
+              >
+                Shift-wise
+              </Button>
+              <Button 
+                variant={activeTab === 'material' ? "default" : "outline"} 
+                size="sm" 
+                onClick={() => setActiveTab('material')}
+                className="font-bold"
+              >
+                Material-wise
+              </Button>
+            </div>
             <CardTitle className="text-2xl text-center flex-1 whitespace-nowrap">2026 RN Generation Details Report</CardTitle>
             <div className="flex items-center gap-2 flex-1 justify-end">
               <Popover>
@@ -454,28 +514,37 @@ export function RNReport() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {['A', 'B', 'C', 'A1', 'C1'].map(shift => (
-                    <React.Fragment key={shift}>
-                      {!hiddenRows.includes(`rn_${shift}_usage`) && (
-                        <TableRow>
-                          <RowHeader title={`Shift ${shift} Usage (kg)`} subtitle={`班次 ${shift} 使用重量`} rowId={`rn_${shift}_usage`} />
-                          {days.map(d => renderCell(d, getShiftData(d, shift).usage, `rn_${shift}_usage`, shift))}
-                        </TableRow>
-                      )}
-                      {!hiddenRows.includes(`rn_${shift}_scrap`) && (
-                        <TableRow>
-                          <RowHeader title={`Shift ${shift} RN (kg)`} subtitle={`班次 ${shift} RN產生重量`} rowId={`rn_${shift}_scrap`} />
-                          {days.map(d => renderCell(d, getShiftData(d, shift).rn, `rn_${shift}_scrap`, shift))}
-                        </TableRow>
-                      )}
-                      {!hiddenRows.includes(`rn_${shift}_rate`) && (
-                        <TableRow className="bg-[#e2f0d9]">
-                          <RowHeader title={`Shift ${shift} Rate (%)`} subtitle={`班次 ${shift} 回收率`} rowId={`rn_${shift}_rate`} />
-                          {days.map(d => renderCell(d, getShiftData(d, shift).rate, `rn_${shift}_rate`, shift))}
-                        </TableRow>
-                      )}
-                    </React.Fragment>
-                  ))}
+                  {activeTab === 'shift' ? (
+                    ['A', 'B', 'C', 'A1', 'C1'].map(shift => (
+                      <React.Fragment key={shift}>
+                        {!hiddenRows.includes(`rn_${shift}_usage`) && (
+                          <TableRow>
+                            <RowHeader title={`Shift ${shift} Usage (kg)`} subtitle={`班次 ${shift} 使用重量`} rowId={`rn_${shift}_usage`} />
+                            {days.map(d => renderCell(d, getShiftData(d, shift).usage, `rn_${shift}_usage`, shift))}
+                          </TableRow>
+                        )}
+                        {!hiddenRows.includes(`rn_${shift}_scrap`) && (
+                          <TableRow>
+                            <RowHeader title={`Shift ${shift} RN (kg)`} subtitle={`班次 ${shift} RN產生重量`} rowId={`rn_${shift}_scrap`} />
+                            {days.map(d => renderCell(d, getShiftData(d, shift).rn, `rn_${shift}_scrap`, shift))}
+                          </TableRow>
+                        )}
+                        {!hiddenRows.includes(`rn_${shift}_rate`) && (
+                          <TableRow className="bg-[#e2f0d9]">
+                            <RowHeader title={`Shift ${shift} Rate (%)`} subtitle={`班次 ${shift} 回收率`} rowId={`rn_${shift}_rate`} />
+                            {days.map(d => renderCell(d, getShiftData(d, shift).rate, `rn_${shift}_rate`, shift))}
+                          </TableRow>
+                        )}
+                      </React.Fragment>
+                    ))
+                  ) : (
+                    uniqueMaterials.map(mat => (
+                      <TableRow key={mat}>
+                        <RowHeader title={mat} subtitle="膠料類型" rowId={`rn_mat_${mat}`} />
+                        {days.map(d => renderCell(d, getMaterialData(d, mat), `rn_mat_${mat}`, undefined, mat))}
+                      </TableRow>
+                    ))
+                  )}
                   {!hiddenRows.includes("rn_total_usage") && (
                     <TableRow className="bg-gray-100 font-bold">
                       <RowHeader title="TOTAL Usage (kg)" subtitle="總使用重量" rowId="rn_total_usage" />
@@ -516,13 +585,13 @@ export function RNReport() {
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="date" />
                   <YAxis />
-                  <Tooltip />
+                  <Tooltip formatter={(v: number) => [`${(v/1000).toFixed(0)} t`, '']} />
                   <Legend />
-                  <Line type="monotone" dataKey="usage" name="Usage" stroke="#2563eb" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }}>
-                    <LabelList dataKey="usage" position="top" style={{ fontSize: '10px', fill: '#2563eb', fontWeight: 'bold' }} />
+                  <Line type="monotone" dataKey="usage" name="Usage (t)" stroke="#2563eb" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }}>
+                    <LabelList dataKey="usage" position="top" formatter={(v: number) => (v/1000).toFixed(0)} style={{ fontSize: '10px', fill: '#2563eb', fontWeight: 'bold' }} />
                   </Line>
-                  <Line type="monotone" dataKey="rn" name="RN" stroke="#dc2626" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }}>
-                    <LabelList dataKey="rn" position="top" style={{ fontSize: '10px', fill: '#dc2626', fontWeight: 'bold' }} />
+                  <Line type="monotone" dataKey="rn" name="RN (t)" stroke="#dc2626" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }}>
+                    <LabelList dataKey="rn" position="top" formatter={(v: number) => (v/1000).toFixed(0)} style={{ fontSize: '10px', fill: '#dc2626', fontWeight: 'bold' }} />
                   </Line>
                 </LineChart>
               </ResponsiveContainer>
@@ -543,12 +612,13 @@ export function RNReport() {
                 <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="date" />
-                  <YAxis unit="%" />
-                  <Tooltip formatter={(value: number) => [`${value.toFixed(3)}%`, 'Rate']} />
+                  <YAxis unit="%" domain={[0, 100]} />
+                  <Tooltip formatter={(value: number) => [`${value.toFixed(1)}%`, 'Rate']} />
                   <Legend />
                   <Line type="monotone" dataKey="rate" name="RN Rate" stroke="#16a34a" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }}>
-                    <LabelList dataKey="rate" position="top" formatter={(v: number) => v.toFixed(2) + '%'} style={{ fontSize: '10px', fill: '#16a34a', fontWeight: 'bold' }} />
+                    <LabelList dataKey="rate" position="top" formatter={(v: number) => v.toFixed(1) + '%'} style={{ fontSize: '10px', fill: '#16a34a', fontWeight: 'bold' }} />
                   </Line>
+                  <Line type="stepAfter" dataKey="target" name="Target" stroke="#000000" strokeDasharray="5 5" strokeWidth={1} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>

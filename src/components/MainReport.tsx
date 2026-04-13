@@ -18,7 +18,7 @@ export function MainReport() {
     from: startOfWeek(new Date(), { weekStartsOn: 1 }),
     to: endOfWeek(new Date(), { weekStartsOn: 1 }),
   });
-  const { data, targets, config, loading, error, loadData, loadTargets, updateTargets, saveTargetsToSheet, isSyncingTargets } = useData();
+  const { data, targets, configs, loading, error, loadData, loadTargets, updateTargets, saveTargetsToSheet, isSyncingTargets } = useData();
   const [copiedText, setCopiedText] = useState(false);
   const [copiedImage, setCopiedImage] = useState(false);
   const [detailModal, setDetailModal] = useState<{date: Date, type: 'BIC' | 'PLY_CHAFER' | 'RUBBER_MIXING' | 'RN'} | null>(null);
@@ -464,17 +464,20 @@ export function MainReport() {
   };
 
   useEffect(() => {
-    if (isEditingTargets && !config && !isSyncingTargets) {
+    if (isEditingTargets && configs.length === 0 && !isSyncingTargets) {
       loadTargets();
     }
-  }, [isEditingTargets, config, isSyncingTargets, loadTargets]);
+  }, [isEditingTargets, configs, isSyncingTargets, loadTargets]);
 
   const handleLogin = () => {
-    if (!config) {
+    if (configs.length === 0) {
       setLoginError('Configuration could not be loaded from Google Sheets. Please ensure the backend script is updated to return ID and Password.');
       return;
     }
-    if (loginForm.id === config.id && loginForm.password === config.password) {
+    
+    const matched = configs.find(c => c.id === loginForm.id && c.password === loginForm.password);
+    
+    if (matched) {
       setIsLoggedIn(true);
       setLoginError('');
     } else {
@@ -927,7 +930,7 @@ export function MainReport() {
             
             {!isLoggedIn ? (
               <div className="p-6 space-y-4">
-                {isSyncingTargets && !config ? (
+                {isSyncingTargets && configs.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8 space-y-3">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                     <p className="text-sm text-muted-foreground">Syncing configuration...</p>

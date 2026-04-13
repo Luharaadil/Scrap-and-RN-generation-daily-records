@@ -5,7 +5,7 @@ import { fetchRangeData, fetchTargets, getWebAppUrl, saveTargets } from './api';
 interface DataContextType {
   data: any;
   targets: any;
-  config: any;
+  configs: any[];
   loading: boolean;
   error: string;
   loadData: (force?: boolean) => Promise<void>;
@@ -19,7 +19,7 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const [data, setData] = useState<any>(null);
-  const [config, setConfig] = useState<any>(null);
+  const [configs, setConfigs] = useState<any[]>([]);
   const [targets, setTargets] = useState<any>({
     bic_scrap: { value: 0, period: 'daily' },
     ply_scrap: { value: 0, period: 'daily' },
@@ -45,10 +45,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     try {
       const targetResult = await fetchTargets();
       console.log('Targets fetched:', targetResult);
-      if (targetResult && targetResult.config) {
-        setConfig(targetResult.config);
+      if (targetResult && targetResult.configs) {
+        setConfigs(targetResult.configs);
+      } else if (targetResult && targetResult.config) {
+        setConfigs([targetResult.config]);
       } else {
-        console.warn('No config found in targetResult. Ensure Google Apps Script returns a "config" object with id and password.');
+        console.warn('No configs found in targetResult. Ensure Google Apps Script returns a "configs" array with id and password.');
       }
       if (targetResult && targetResult.targets) {
         const newTargets: any = { ...targets };
@@ -128,7 +130,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <DataContext.Provider value={{ data, targets, config, loading, error, loadData, loadTargets, updateTargets, saveTargetsToSheet, isSyncingTargets }}>
+    <DataContext.Provider value={{ data, targets, configs, loading, error, loadData, loadTargets, updateTargets, saveTargetsToSheet, isSyncingTargets }}>
       {children}
     </DataContext.Provider>
   );
