@@ -1,15 +1,17 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { format, startOfMonth } from 'date-fns';
-import { fetchRangeData, fetchTargets, getWebAppUrl } from './api';
+import { fetchRangeData, fetchTargets, getWebAppUrl, saveTargets } from './api';
 
 interface DataContextType {
   data: any;
   targets: any;
+  config: any;
   loading: boolean;
   error: string;
   loadData: (force?: boolean) => Promise<void>;
   loadTargets: () => Promise<void>;
   updateTargets: (newTargets: any) => void;
+  saveTargetsToSheet: (newTargets: any) => Promise<void>;
   isSyncingTargets: boolean;
 }
 
@@ -17,6 +19,7 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const [data, setData] = useState<any>(null);
+  const [config, setConfig] = useState<any>(null);
   const [targets, setTargets] = useState<any>({
     bic_scrap: { value: 0, period: 'daily' },
     ply_scrap: { value: 0, period: 'daily' },
@@ -41,6 +44,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     setIsSyncingTargets(true);
     try {
       const targetResult = await fetchTargets();
+      console.log('Targets fetched:', targetResult);
+      if (targetResult && targetResult.config) {
+        setConfig(targetResult.config);
+      } else {
+        console.warn('No config found in targetResult. Ensure Google Apps Script returns a "config" object with id and password.');
+      }
       if (targetResult && targetResult.targets) {
         const newTargets: any = { ...targets };
         targetResult.targets.forEach((t: any) => {
@@ -71,6 +80,20 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       setIsSyncingTargets(false);
     }
   }, [targets]);
+
+  const saveTargetsToSheet = useCallback(async (newTargets: any) => {
+    if (!getWebAppUrl()) return;
+    setIsSyncingTargets(true);
+    try {
+      await saveTargets(newTargets);
+      setTargets(newTargets);
+    } catch (err) {
+      console.error('Failed to save targets:', err);
+      throw err;
+    } finally {
+      setIsSyncingTargets(false);
+    }
+  }, []);
 
   const loadData = useCallback(async (force = false) => {
     if (!getWebAppUrl()) return;
@@ -105,7 +128,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <DataContext.Provider value={{ data, targets, loading, error, loadData, loadTargets, updateTargets, isSyncingTargets }}>
+    <DataContext.Provider value={{ data, targets, config, loading, error, loadData, loadTargets, updateTargets, saveTargetsToSheet, isSyncingTargets }}>
       {children}
     </DataContext.Provider>
   );

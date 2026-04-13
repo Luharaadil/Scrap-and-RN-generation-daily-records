@@ -12,7 +12,7 @@ import { DateRange } from 'react-day-picker';
 import { useSidebar } from '@/src/lib/SidebarContext';
 import { useData } from '@/src/lib/DataContext';
 import { startOfWeek, endOfWeek } from 'date-fns';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
 
 const rowDefinitions = [
   ...['A', 'B', 'C', 'A1', 'C1'].flatMap(shift => [
@@ -47,6 +47,7 @@ export function RNReport() {
     return saved ? JSON.parse(saved) : [];
   });
   const tableRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<HTMLDivElement>(null);
   const scrapModalRef = useRef<HTMLDivElement>(null);
   const { setControls } = useSidebar();
 
@@ -182,7 +183,25 @@ export function RNReport() {
   const copyAsPicture = useCallback(async () => {
     if (!tableRef.current) return;
     try {
-      const blob = await toBlob(tableRef.current, { backgroundColor: '#ffffff', pixelRatio: 2 });
+      // Create a temporary container to hold both table and charts for capture
+      const container = document.createElement('div');
+      container.style.padding = '20px';
+      container.style.background = '#ffffff';
+      container.style.width = '1200px'; // Fixed width for consistent capture
+      
+      const tableClone = tableRef.current.cloneNode(true) as HTMLDivElement;
+      tableClone.style.marginBottom = '20px';
+      container.appendChild(tableClone);
+      
+      if (chartRef.current) {
+        const chartClone = chartRef.current.cloneNode(true) as HTMLDivElement;
+        container.appendChild(chartClone);
+      }
+      
+      document.body.appendChild(container);
+      const blob = await toBlob(container, { backgroundColor: '#ffffff', pixelRatio: 2 });
+      document.body.removeChild(container);
+
       if (!blob) return;
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
       setCopiedImage(true);
@@ -482,7 +501,7 @@ export function RNReport() {
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" ref={chartRef}>
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -493,14 +512,18 @@ export function RNReport() {
           <CardContent>
             <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
+                <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="date" />
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Line type="monotone" dataKey="usage" name="Usage" stroke="#2563eb" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                  <Line type="monotone" dataKey="rn" name="RN" stroke="#dc2626" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                  <Line type="monotone" dataKey="usage" name="Usage" stroke="#2563eb" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }}>
+                    <LabelList dataKey="usage" position="top" style={{ fontSize: '10px', fill: '#2563eb', fontWeight: 'bold' }} />
+                  </Line>
+                  <Line type="monotone" dataKey="rn" name="RN" stroke="#dc2626" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }}>
+                    <LabelList dataKey="rn" position="top" style={{ fontSize: '10px', fill: '#dc2626', fontWeight: 'bold' }} />
+                  </Line>
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -517,13 +540,15 @@ export function RNReport() {
           <CardContent>
             <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
+                <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="date" />
                   <YAxis unit="%" />
                   <Tooltip formatter={(value: number) => [`${value.toFixed(3)}%`, 'Rate']} />
                   <Legend />
-                  <Line type="monotone" dataKey="rate" name="RN Rate" stroke="#16a34a" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                  <Line type="monotone" dataKey="rate" name="RN Rate" stroke="#16a34a" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }}>
+                    <LabelList dataKey="rate" position="top" formatter={(v: number) => v.toFixed(2) + '%'} style={{ fontSize: '10px', fill: '#16a34a', fontWeight: 'bold' }} />
+                  </Line>
                 </LineChart>
               </ResponsiveContainer>
             </div>

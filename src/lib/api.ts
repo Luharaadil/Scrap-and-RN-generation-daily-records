@@ -75,3 +75,18 @@ export const saveScrapDetails = async (data: any) => {
   
   return response.json();
 };
+
+export const saveTargets = async (targets: any) => {
+  const response = await fetch(WEB_APP_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'text/plain;charset=utf-8',
+    },
+    body: JSON.stringify({
+      action: 'saveTargets',
+      targets: targets
+    })
+  });
+  
+  return response.json();
+};

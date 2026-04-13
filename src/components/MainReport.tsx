@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, getDate, getDay, startOfMonth, startOfYear, isSameMonth, isSameWeek } from 'date-fns';
-import { Calendar as CalendarIcon, Loader2, RefreshCw, Copy, Image as ImageIcon, Check, X, Type, Plus, Minus } from 'lucide-react';
+import { Calendar as CalendarIcon, Loader2, RefreshCw, Copy, Image as ImageIcon, Check, X, Type, Plus, Minus, Save } from 'lucide-react';
 import { toBlob } from 'html-to-image';
 import { Calendar } from '@/src/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/src/components/ui/popover';
@@ -18,7 +18,7 @@ export function MainReport() {
     from: startOfWeek(new Date(), { weekStartsOn: 1 }),
     to: endOfWeek(new Date(), { weekStartsOn: 1 }),
   });
-  const { data, targets, loading, error, loadData, loadTargets, updateTargets, isSyncingTargets } = useData();
+  const { data, targets, config, loading, error, loadData, loadTargets, updateTargets, saveTargetsToSheet, isSyncingTargets } = useData();
   const [copiedText, setCopiedText] = useState(false);
   const [copiedImage, setCopiedImage] = useState(false);
   const [detailModal, setDetailModal] = useState<{date: Date, type: 'BIC' | 'PLY_CHAFER' | 'RUBBER_MIXING' | 'RN'} | null>(null);
@@ -32,6 +32,9 @@ export function MainReport() {
     return saved ? JSON.parse(saved) : {};
   });
   const [isEditingTargets, setIsEditingTargets] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loginForm, setLoginForm] = useState({ id: '', password: '' });
+  const [loginError, setLoginError] = useState('');
   const tableRef = useRef<HTMLDivElement>(null);
   const scrapModalRef = useRef<HTMLDivElement>(null);
   const usageModalRef = useRef<HTMLDivElement>(null);
@@ -457,6 +460,36 @@ export function MainReport() {
       setTimeout(() => setModalCopied(false), 2000);
     } catch (err) {
       console.error('Failed to copy modal picture', err);
+    }
+  };
+
+  useEffect(() => {
+    if (isEditingTargets && !config && !isSyncingTargets) {
+      loadTargets();
+    }
+  }, [isEditingTargets, config, isSyncingTargets, loadTargets]);
+
+  const handleLogin = () => {
+    if (!config) {
+      setLoginError('Configuration could not be loaded from Google Sheets. Please ensure the backend script is updated to return ID and Password.');
+      return;
+    }
+    if (loginForm.id === config.id && loginForm.password === config.password) {
+      setIsLoggedIn(true);
+      setLoginError('');
+    } else {
+      setLoginError('Invalid ID or Password');
+    }
+  };
+
+  const handleSaveTargets = async () => {
+    try {
+      await saveTargetsToSheet(targets);
+      setIsEditingTargets(false);
+      setIsLoggedIn(false);
+      setLoginForm({ id: '', password: '' });
+    } catch (err) {
+      alert('Failed to save targets to Google Sheet');
     }
   };
 
@@ -887,54 +920,106 @@ export function MainReport() {
                   <RefreshCw className="h-4 w-4" />
                 </Button>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => setIsEditingTargets(false)}>
+              <Button variant="ghost" size="icon" onClick={() => { setIsEditingTargets(false); setIsLoggedIn(false); setLoginForm({ id: '', password: '' }); }}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            <div className="p-4 space-y-4 overflow-y-auto max-h-[70vh]">
-              {(Object.keys(targets) as Array<keyof typeof targets>).map((key) => {
-                const target = targets[key];
-                return (
-                  <div key={key} className="space-y-2 border-b pb-3 last:border-0">
-                    <label className="text-sm font-bold capitalize">{(key as string).replace('_', ' ')}</label>
-                    <div className="flex gap-2">
-                      <div className="flex-1">
-                        <label className="text-[10px] text-gray-500 uppercase">Target Value</label>
-                        <input 
-                          type="number" 
-                          step="0.01"
-                          className="w-full border rounded px-2 py-1 text-sm"
-                          value={target.value}
-                          onChange={(e) => updateTargets({
-                            ...targets,
-                            [key]: { ...targets[key], value: parseFloat(e.target.value) || 0 }
-                          })}
-                        />
-                      </div>
-                      <div className="w-32">
-                        <label className="text-[10px] text-gray-500 uppercase">Period</label>
-                        <select 
-                          className="w-full border rounded px-2 py-1 text-sm"
-                          value={target.period}
-                          onChange={(e) => updateTargets({
-                            ...targets,
-                            [key]: { ...targets[key], period: e.target.value as any }
-                          })}
-                        >
-                          <option value="daily">Daily</option>
-                          <option value="weekly">Weekly</option>
-                          <option value="monthly">Monthly</option>
-                          <option value="not_use">Not use</option>
-                        </select>
-                      </div>
-                    </div>
+            
+            {!isLoggedIn ? (
+              <div className="p-6 space-y-4">
+                {isSyncingTargets && !config ? (
+                  <div className="flex flex-col items-center justify-center py-8 space-y-3">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <p className="text-sm text-muted-foreground">Syncing configuration...</p>
                   </div>
-                );
-              })}
-            </div>
-            <div className="p-4 border-t bg-gray-50 flex justify-end">
-              <Button onClick={() => setIsEditingTargets(false)}>Done</Button>
-            </div>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Admin ID</label>
+                      <input 
+                        type="text" 
+                        className="w-full border rounded px-3 py-2"
+                        value={loginForm.id}
+                        onChange={(e) => setLoginForm(prev => ({ ...prev, id: e.target.value }))}
+                        placeholder="Enter ID"
+                        disabled={isSyncingTargets}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Password</label>
+                      <input 
+                        type="password" 
+                        className="w-full border rounded px-3 py-2"
+                        value={loginForm.password}
+                        onChange={(e) => setLoginForm(prev => ({ ...prev, password: e.target.value }))}
+                        placeholder="Enter Password"
+                        disabled={isSyncingTargets}
+                        onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                      />
+                    </div>
+                    {loginError && <p className="text-red-500 text-xs font-medium">{loginError}</p>}
+                    <Button className="w-full" onClick={handleLogin} disabled={isSyncingTargets}>
+                      {isSyncingTargets ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                      Login
+                    </Button>
+                  </>
+                )}
+              </div>
+            ) : (
+              <>
+                <div className="p-4 space-y-4 overflow-y-auto max-h-[60vh]">
+                  {(Object.keys(targets) as Array<keyof typeof targets>).map((key) => {
+                    const target = targets[key];
+                    return (
+                      <div key={key} className="space-y-2 border-b pb-3 last:border-0">
+                        <label className="text-sm font-bold capitalize">{(key as string).replace('_', ' ')}</label>
+                        <div className="flex gap-2">
+                          <div className="flex-1">
+                            <label className="text-[10px] text-gray-500 uppercase">Target Value</label>
+                            <input 
+                              type="number" 
+                              step="0.01"
+                              className="w-full border rounded px-2 py-1 text-sm"
+                              value={target.value}
+                              onChange={(e) => updateTargets({
+                                ...targets,
+                                [key]: { ...targets[key], value: parseFloat(e.target.value) || 0 }
+                              })}
+                            />
+                          </div>
+                          <div className="w-32">
+                            <label className="text-[10px] text-gray-500 uppercase">Period</label>
+                            <select 
+                              className="w-full border rounded px-2 py-1 text-sm"
+                              value={target.period}
+                              onChange={(e) => updateTargets({
+                                ...targets,
+                                [key]: { ...targets[key], period: e.target.value as any }
+                              })}
+                            >
+                              <option value="daily">Daily</option>
+                              <option value="weekly">Weekly</option>
+                              <option value="monthly">Monthly</option>
+                              <option value="not_use">Not use</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="p-4 border-t bg-gray-50 flex justify-between gap-2">
+                  <Button variant="outline" onClick={() => setIsLoggedIn(false)}>Logout</Button>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" onClick={() => setIsEditingTargets(false)}>Cancel</Button>
+                    <Button onClick={handleSaveTargets} disabled={isSyncingTargets}>
+                      {isSyncingTargets ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                      Save to Sheet
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

@@ -18,6 +18,7 @@ export function Dashboard() {
   
   const [shiftFilter, setShiftFilter] = useState('All');
   const [sectionFilter, setSectionFilter] = useState('All');
+  const [materialFilter, setMaterialFilter] = useState('All');
   const [copiedSummary, setCopiedSummary] = useState(false);
   const [copiedScrap, setCopiedScrap] = useState(false);
   
@@ -94,8 +95,15 @@ export function Dashboard() {
   const filteredScraps = scraps.filter((scrap: any) => {
     if (shiftFilter !== 'All' && scrap.shift !== shiftFilter) return false;
     if (sectionFilter !== 'All' && scrap.section !== sectionFilter) return false;
+    if (materialFilter !== 'All' && scrap.material !== materialFilter) return false;
     return true;
   });
+
+  const getSectionScrapTotal = (material: string, section: string) => {
+    return scraps
+      .filter((s: any) => s.material === material && s.section === section)
+      .reduce((sum: number, s: any) => sum + Number(s.weight || 0), 0);
+  };
 
   const getScrapTotal = (material: string) => {
     return filteredScraps
@@ -180,6 +188,23 @@ export function Dashboard() {
               <SelectItem value="Curing">Curing</SelectItem>
             </SelectContent>
           </Select>
+
+          <Select value={materialFilter} onValueChange={setMaterialFilter}>
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="All">All Types</SelectItem>
+              <SelectItem value="BIC">BIC (鋼絲)</SelectItem>
+              <SelectItem value="PLY">PLY (簾紗)</SelectItem>
+              <SelectItem value="Rubber">Rubber (膠料)</SelectItem>
+              <SelectItem value="RN">RN Generation</SelectItem>
+              <SelectItem value="Chafer">Chafer (防擦布)</SelectItem>
+              <SelectItem value="Fabric">Fabric</SelectItem>
+              <SelectItem value="Carbon">Carbon</SelectItem>
+              <SelectItem value="Chemical">Chemical</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="flex items-center gap-2">
@@ -243,6 +268,14 @@ export function Dashboard() {
                 <span className="text-muted-foreground">Scrap Rate:</span>
                 <span className="font-bold">{hasData ? (calculateRate(displayBicScrap, summary.bicUsage) ?? '0') : ''}</span>
               </div>
+              {hasData && (
+                <div className="mt-2 pt-2 border-t border-dashed text-[10px] space-y-1">
+                  <div className="flex justify-between text-gray-500">
+                    <span>Cutting:</span>
+                    <span>{getSectionScrapTotal('BIC', 'Cutting').toFixed(1)} kg</span>
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -265,6 +298,18 @@ export function Dashboard() {
                 <span className="text-muted-foreground">Scrap Rate:</span>
                 <span className="font-bold">{hasData ? (calculateRate(displayPlyScrap, summary.plyUsage) ?? '0') : ''}</span>
               </div>
+              {hasData && (
+                <div className="mt-2 pt-2 border-t border-dashed text-[10px] space-y-1">
+                  <div className="flex justify-between text-gray-500">
+                    <span>Calendering:</span>
+                    <span>{getSectionScrapTotal('PLY', 'Calendering').toFixed(1)} kg</span>
+                  </div>
+                  <div className="flex justify-between text-gray-500">
+                    <span>Cutting:</span>
+                    <span>{getSectionScrapTotal('PLY', 'Cutting').toFixed(1)} kg</span>
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -287,6 +332,18 @@ export function Dashboard() {
                 <span className="text-muted-foreground">Scrap Rate:</span>
                 <span className="font-bold">{hasData ? (calculateRate(displayRubberScrap, summary.rubberUsage) ?? '0') : ''}</span>
               </div>
+              {hasData && (
+                <div className="mt-2 pt-2 border-t border-dashed text-[10px] space-y-1">
+                  <div className="flex justify-between text-gray-500">
+                    <span>Mixing:</span>
+                    <span>{getSectionScrapTotal('Rubber', 'Mixing').toFixed(1)} kg</span>
+                  </div>
+                  <div className="flex justify-between text-gray-500">
+                    <span>Tire building:</span>
+                    <span>{getSectionScrapTotal('Rubber', 'Tire building').toFixed(1)} kg</span>
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -309,6 +366,18 @@ export function Dashboard() {
                 <span className="text-muted-foreground">Scrap Rate:</span>
                 <span className="font-bold">{hasData ? (calculateRate(displayRnScrap, summary.extrusionRubberUsage) ?? '0') : ''}</span>
               </div>
+              {hasData && (
+                <div className="mt-2 pt-2 border-t border-dashed text-[10px] space-y-1">
+                  <div className="flex justify-between text-gray-500">
+                    <span>Extrusion:</span>
+                    <span>{getSectionScrapTotal('Extrusion Rubber', 'Extrusion').toFixed(1)} kg</span>
+                  </div>
+                  <div className="flex justify-between text-gray-500">
+                    <span>Tire building:</span>
+                    <span>{getSectionScrapTotal('RN', 'Tire building').toFixed(1)} kg</span>
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
