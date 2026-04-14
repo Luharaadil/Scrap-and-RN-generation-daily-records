@@ -12,6 +12,7 @@ interface DataContextType {
   loadTargets: () => Promise<void>;
   updateTargets: (newTargets: any) => void;
   saveTargetsToSheet: (newTargets: any) => Promise<void>;
+  updateScrapReasonInSheet: (timestamp: string, newReason: string) => Promise<void>;
   isSyncingTargets: boolean;
 }
 
@@ -124,13 +125,28 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [data, lastFetchRange]);
 
+  const updateScrapReasonInSheet = useCallback(async (timestamp: string, newReason: string) => {
+    if (!getWebAppUrl()) return;
+    setLoading(true);
+    try {
+      const { updateScrapReason } = await import('./api');
+      await updateScrapReason(timestamp, newReason);
+      await loadData(true);
+    } catch (err) {
+      console.error('Failed to update scrap reason:', err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [loadData]);
+
   useEffect(() => {
     loadTargets();
     loadData();
   }, []);
 
   return (
-    <DataContext.Provider value={{ data, targets, configs, loading, error, loadData, loadTargets, updateTargets, saveTargetsToSheet, isSyncingTargets }}>
+    <DataContext.Provider value={{ data, targets, configs, loading, error, loadData, loadTargets, updateTargets, saveTargetsToSheet, updateScrapReasonInSheet, isSyncingTargets }}>
       {children}
     </DataContext.Provider>
   );

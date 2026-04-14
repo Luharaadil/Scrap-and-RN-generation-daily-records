@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Loader2, RefreshCw, ImageIcon, Check } from 'lucide-react';
+import { Calendar as CalendarIcon, Loader2, RefreshCw, ImageIcon, Check, Edit2, Save, X } from 'lucide-react';
 import { Calendar } from '@/src/components/ui/calendar';
 import { toBlob } from 'html-to-image';
 import { Popover, PopoverContent, PopoverTrigger } from '@/src/components/ui/popover';
@@ -14,13 +14,17 @@ import { useData } from '@/src/lib/DataContext';
 
 export function Dashboard() {
   const [date, setDate] = useState<Date>(new Date());
-  const { data, loading, error, loadData } = useData();
+  const { data, loading, error, loadData, updateScrapReasonInSheet } = useData();
   
   const [shiftFilter, setShiftFilter] = useState('All');
   const [sectionFilter, setSectionFilter] = useState('All');
   const [materialFilter, setMaterialFilter] = useState('All');
   const [copiedSummary, setCopiedSummary] = useState(false);
   const [copiedScrap, setCopiedScrap] = useState(false);
+  
+  const [editingScrap, setEditingScrap] = useState<string | null>(null);
+  const [editReason, setEditReason] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
   
   const summaryRef = useRef<HTMLDivElement>(null);
   const scrapTableRef = useRef<HTMLDivElement>(null);
@@ -154,6 +158,24 @@ export function Dashboard() {
     } catch (e) {
       return timestamp;
     }
+  };
+
+  const handleSaveReason = async (timestamp: string) => {
+    if (!timestamp) return;
+    setIsUpdating(true);
+    try {
+      await updateScrapReasonInSheet(timestamp, editReason);
+      setEditingScrap(null);
+    } catch (err) {
+      alert('Failed to update reason');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const startEditing = (scrap: any) => {
+    setEditingScrap(scrap.timestamp);
+    setEditReason(scrap.reason || '');
   };
 
   return (
@@ -425,7 +447,49 @@ export function Dashboard() {
                     <TableCell className="font-medium">{scrap.material}</TableCell>
                     <TableCell>{scrap.materialName || '-'}</TableCell>
                     <TableCell>{typeof scrap.weight === 'number' ? (scrap.weight === 0 ? '0' : scrap.weight.toFixed(1)) : (scrap.weight || '0')}</TableCell>
-                    <TableCell>{scrap.reason}</TableCell>
+                    <TableCell>
+                      {editingScrap === scrap.timestamp ? (
+                        <div className="flex items-center gap-2">
+                          <input 
+                            type="text" 
+                            className="border rounded px-2 py-1 text-sm flex-1"
+                            value={editReason}
+                            onChange={(e) => setEditReason(e.target.value)}
+                            autoFocus
+                          />
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-green-600"
+                            onClick={() => handleSaveReason(scrap.timestamp)}
+                            disabled={isUpdating}
+                          >
+                            {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-red-600"
+                            onClick={() => setEditingScrap(null)}
+                            disabled={isUpdating}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between group">
+                          <span>{scrap.reason}</span>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => startEditing(scrap)}
+                          >
+                            <Edit2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {scrap.imageUrl ? (
                         <a href={scrap.imageUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
