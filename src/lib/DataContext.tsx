@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { format, startOfMonth } from 'date-fns';
+import { format, startOfMonth, startOfWeek, endOfWeek, getISOWeek, setISOWeek, getYear, startOfISOWeek, endOfISOWeek, addWeeks } from 'date-fns';
 import { fetchRangeData, fetchTargets, getWebAppUrl, saveTargets } from './api';
+import { DateRange } from 'react-day-picker';
 
 interface DataContextType {
   data: any;
@@ -14,6 +15,16 @@ interface DataContextType {
   saveTargetsToSheet: (newTargets: any) => Promise<void>;
   updateScrapReasonInSheet: (timestamp: string, newReason: string) => Promise<void>;
   isSyncingTargets: boolean;
+  globalDateRange: DateRange | undefined;
+  setGlobalDateRange: (range: DateRange | undefined) => void;
+  globalShift: string;
+  setGlobalShift: (shift: string) => void;
+  globalSection: string;
+  setGlobalSection: (section: string) => void;
+  selectedWeek: number;
+  setSelectedWeek: (week: number) => void;
+  numWeeks: number;
+  setNumWeeks: (num: number) => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -35,6 +46,27 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [isSyncingTargets, setIsSyncingTargets] = useState(false);
   const [error, setError] = useState('');
   const [lastFetchRange, setLastFetchRange] = useState<{ start: string, end: string } | null>(null);
+
+  const [globalDateRange, setGlobalDateRange] = useState<DateRange | undefined>({
+    from: startOfWeek(new Date(), { weekStartsOn: 1 }),
+    to: endOfWeek(new Date(), { weekStartsOn: 1 }),
+  });
+  const [globalShift, setGlobalShift] = useState('All');
+  const [globalSection, setGlobalSection] = useState('All');
+  const [selectedWeek, setSelectedWeek] = useState<number>(getISOWeek(new Date()));
+  const [numWeeks, setNumWeeks] = useState<number>(1);
+
+  // Update date range when week or numWeeks changes
+  useEffect(() => {
+    const year = getYear(new Date());
+    const lastDayOfWeek = endOfISOWeek(setISOWeek(new Date(year, 0, 4), selectedWeek));
+    const firstDayOfWeek = startOfISOWeek(addWeeks(lastDayOfWeek, -(numWeeks - 1)));
+    
+    setGlobalDateRange({
+      from: firstDayOfWeek,
+      to: lastDayOfWeek
+    });
+  }, [selectedWeek, numWeeks]);
 
   const updateTargets = useCallback((newTargets: any) => {
     setTargets(newTargets);
@@ -146,7 +178,15 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <DataContext.Provider value={{ data, targets, configs, loading, error, loadData, loadTargets, updateTargets, saveTargetsToSheet, updateScrapReasonInSheet, isSyncingTargets }}>
+    <DataContext.Provider value={{ 
+      data, targets, configs, loading, error, loadData, loadTargets, updateTargets, 
+      saveTargetsToSheet, updateScrapReasonInSheet, isSyncingTargets,
+      globalDateRange, setGlobalDateRange,
+      globalShift, setGlobalShift,
+      globalSection, setGlobalSection,
+      selectedWeek, setSelectedWeek,
+      numWeeks, setNumWeeks
+    }}>
       {children}
     </DataContext.Provider>
   );

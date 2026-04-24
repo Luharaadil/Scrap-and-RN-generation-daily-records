@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Loader2, Upload, X, Save } from 'lucide-react';
+import { Calendar as CalendarIcon, Loader2, Upload, X, Save, Package, Tag, Clock, Factory, Scale, AlertCircle, FileText, Camera } from 'lucide-react';
 import { Calendar } from '@/src/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/src/components/ui/popover';
 import { Button } from '@/src/components/ui/button';
@@ -14,6 +14,7 @@ import { useData } from '@/src/lib/DataContext';
 
 export function ScrapEntry() {
   const [date, setDate] = useState<Date>(new Date());
+  
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -24,6 +25,7 @@ export function ScrapEntry() {
     materialName: '',
     weight: '',
     reason: '',
+    mainReason: '',
     shift: '',
     section: '',
     customSection: ''
@@ -74,6 +76,10 @@ export function ScrapEntry() {
       setMessage('Error: Please enter the material name');
       return;
     }
+    if (!formData.mainReason) {
+      setMessage('Error: Please select a main reason');
+      return;
+    }
     if (!formData.shift) {
       setMessage('Error: Please select a shift');
       return;
@@ -98,6 +104,7 @@ export function ScrapEntry() {
         materialName: formData.materialName,
         weight: formData.weight || 0,
         reason: formData.reason,
+        mainReason: formData.mainReason,
         shift: formData.shift,
         section: formData.section === 'Manual' ? formData.customSection : formData.section,
         imageBase64: image?.base64,
@@ -106,7 +113,7 @@ export function ScrapEntry() {
       
       setMessage('Scrap data saved successfully!');
       loadData(true);
-      setFormData({ material: '', materialName: '', weight: '', reason: '', shift: '', section: '', customSection: '' });
+      setFormData({ material: '', materialName: '', weight: '', reason: '', mainReason: '', shift: '', section: '', customSection: '' });
       clearImage();
     } catch (err: any) {
       setMessage(`Error: ${err.message}`);
@@ -148,12 +155,15 @@ export function ScrapEntry() {
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-6 pt-4">
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
             <div className="space-y-2">
-              <Label>Material Type</Label>
+              <Label className="flex items-center gap-2 text-sm font-semibold">
+                <Package className="h-4 w-4 text-primary" />
+                Material Type
+              </Label>
               <Select value={formData.material} onValueChange={(v) => handleSelectChange('material', v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select material type" />
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="BIC">BIC (鋼絲)</SelectItem>
@@ -169,7 +179,10 @@ export function ScrapEntry() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="materialName">Material Name / Code</Label>
+              <Label className="flex items-center gap-2 text-sm font-semibold" htmlFor="materialName">
+                <Tag className="h-4 w-4 text-primary" />
+                Material Name / Code
+              </Label>
               <Input 
                 id="materialName" 
                 name="materialName" 
@@ -177,13 +190,17 @@ export function ScrapEntry() {
                 value={formData.materialName} 
                 onChange={handleChange} 
                 placeholder="Enter name or code"
+                className="h-11"
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Shift</Label>
+              <Label className="flex items-center gap-2 text-sm font-semibold">
+                <Clock className="h-4 w-4 text-primary" />
+                Shift
+              </Label>
               <Select value={formData.shift} onValueChange={(v) => handleSelectChange('shift', v)}>
-                <SelectTrigger>
+                <SelectTrigger className="h-11">
                   <SelectValue placeholder="Select shift" />
                 </SelectTrigger>
                 <SelectContent>
@@ -197,9 +214,12 @@ export function ScrapEntry() {
             </div>
 
             <div className="space-y-2">
-              <Label>Section</Label>
+              <Label className="flex items-center gap-2 text-sm font-semibold">
+                <Factory className="h-4 w-4 text-primary" />
+                Section
+              </Label>
               <Select value={formData.section} onValueChange={(v) => handleSelectChange('section', v)}>
-                <SelectTrigger>
+                <SelectTrigger className="h-11">
                   <SelectValue placeholder="Select section" />
                 </SelectTrigger>
                 <SelectContent>
@@ -213,25 +233,27 @@ export function ScrapEntry() {
                 </SelectContent>
               </Select>
             </div>
-          </div>
 
-          {formData.section === 'Manual' && (
-            <div className="space-y-2">
-              <Label htmlFor="customSection">Custom Section Name</Label>
-              <Input 
-                id="customSection" 
-                name="customSection" 
-                required
-                value={formData.customSection} 
-                onChange={handleChange} 
-                placeholder="Enter section name"
-              />
-            </div>
-          )}
+            {formData.section === 'Manual' && (
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="customSection" className="font-semibold">Custom Section Name</Label>
+                <Input 
+                  id="customSection" 
+                  name="customSection" 
+                  required
+                  value={formData.customSection} 
+                  onChange={handleChange} 
+                  placeholder="Enter section name"
+                  className="h-11"
+                />
+              </div>
+            )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label htmlFor="weight">Scrap Weight (kg)</Label>
+              <Label className="flex items-center gap-2 text-sm font-semibold" htmlFor="weight">
+                <Scale className="h-4 w-4 text-primary" />
+                Scrap Weight (kg)
+              </Label>
               <Input 
                 id="weight" 
                 name="weight" 
@@ -240,18 +262,44 @@ export function ScrapEntry() {
                 required
                 value={formData.weight} 
                 onChange={handleChange} 
-                placeholder="0"
+                placeholder="0.00"
+                className="h-11"
               />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="reason">Reason for Scrap</Label>
+              <Label className="flex items-center gap-2 text-sm font-semibold">
+                <AlertCircle className="h-4 w-4 text-primary" />
+                Main Reason
+              </Label>
+              <Select value={formData.mainReason} onValueChange={(v) => handleSelectChange('mainReason', v)}>
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Select reason" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Die Rubber">Die Rubber</SelectItem>
+                  <SelectItem value="Machine NG">Machine NG</SelectItem>
+                  <SelectItem value="Human Error">Human Error</SelectItem>
+                  <SelectItem value="Process scrap">Process scrap</SelectItem>
+                  <SelectItem value="Spec finish">Spec finish</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label className="flex items-center gap-2 text-sm font-semibold" htmlFor="reason">
+                <FileText className="h-4 w-4 text-primary" />
+                Reason for Scrap (Details)
+              </Label>
               <Input 
                 id="reason" 
                 name="reason" 
                 required
                 value={formData.reason} 
                 onChange={handleChange} 
-                placeholder="e.g., Machine error"
+                placeholder="Provide more specific details..."
+                className="h-11"
               />
             </div>
           </div>

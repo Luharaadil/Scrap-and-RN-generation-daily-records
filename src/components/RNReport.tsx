@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { format, eachDayOfInterval } from 'date-fns';
+import { format, eachDayOfInterval, isAfter, startOfDay } from 'date-fns';
 import { Calendar as CalendarIcon, RefreshCw, Copy, Image as ImageIcon, Check, Type, Plus, Minus, X, Eye, EyeOff, TrendingUp } from 'lucide-react';
 import { toBlob } from 'html-to-image';
 import { Calendar } from '@/src/components/ui/calendar';
@@ -7,12 +7,13 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/src/components/ui/pop
 import { Button } from '@/src/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/components/ui/select';
 import { cn } from '@/src/lib/utils';
 import { DateRange } from 'react-day-picker';
 import { useSidebar } from '@/src/lib/SidebarContext';
 import { useData } from '@/src/lib/DataContext';
 import { startOfWeek, endOfWeek } from 'date-fns';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
 
 const rowDefinitions = [
   ...['A', 'B', 'C', 'A1', 'C1'].flatMap(shift => [
@@ -26,16 +27,17 @@ const rowDefinitions = [
 ];
 
 export function RNReport() {
-  const [date, setDate] = useState<DateRange | undefined>({
-    from: startOfWeek(new Date(), { weekStartsOn: 1 }),
-    to: endOfWeek(new Date(), { weekStartsOn: 1 }),
-  });
-  const { data, targets, loading, error, loadData } = useData();
+  const { 
+    data, targets, loading, error, loadData,
+    globalDateRange: date, setGlobalDateRange: setDate,
+    selectedWeek, setSelectedWeek,
+    numWeeks, setNumWeeks
+  } = useData();
   const [activeTab, setActiveTab] = useState<'shift' | 'material'>('shift');
   const [copiedText, setCopiedText] = useState(false);
   const [copiedImage, setCopiedImage] = useState(false);
   const [isEditingFont, setIsEditingFont] = useState(false);
-  const [detailModal, setDetailModal] = useState<{date: Date, shift?: string} | null>(null);
+  const [detailModal, setDetailModal] = useState<{date: Date, shift?: string, materialName?: string} | null>(null);
   const [highlightedCols, setHighlightedCols] = useState<number[]>([]);
   const [highlightedRows, setHighlightedRows] = useState<number[]>([]);
   const [modalCopied, setModalCopied] = useState(false);
@@ -77,7 +79,7 @@ export function RNReport() {
   const adjustFontSize = useCallback((rowId: string, delta: number) => {
     setRowFontSizes(prev => ({
       ...prev,
-      [rowId]: Math.max(8, (prev[rowId] || 14) + delta)
+      [rowId]: Math.max(8, (prev[rowId] || 17) + delta)
     }));
   }, []);
 
@@ -96,15 +98,23 @@ export function RNReport() {
     const summary = data?.summaries?.find((s: any) => s.date === formattedDate && s.shift === shift);
     const scraps = data?.scraps?.filter((s: any) => s.date === formattedDate && s.shift === shift) || [];
     
-    const extrusionUsage = parseFloat(summary?.extrusionRubberUsage) || 0;
-    const tireBuildingUsage = parseFloat(summary?.tireBuildingUsage) || 0;
-    // Point 1: Usage includes both extrusion rubber and tire building
-    const usage = extrusionUsage + tireBuildingUsage;
+    if (!summary && scraps.length === 0) {
+      return { usage: null, rn: null, rate: null, extrusionUsage: 0, calenderingUsage: 0, tireBuildingUsage: 0, extrusionScrap: 0, calenderingScrap: 0, tireBuildingScrap: 0 };
+    }
 
-    // Point 4: Ensure Tire Building RN is correctly identified
+    const extrusionUsage = parseFloat(summary?.extrusionRubberUsage) || 0;
+    const calenderingUsage = parseFloat(summary?.plyUsage) || 0;
+    const tireBuildingUsage = parseFloat(summary?.tireBuildingUsage) || 0;
+    const usage = extrusionUsage;
+
     const extrusionScrap = scraps.filter((s: any) => 
       (s.material === 'Extrusion Rubber' || s.material === 'RN') && 
       (s.section === 'Extrusion' || !s.section || s.section === 'Mixing')
+    ).reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
+
+    const calenderingScrap = scraps.filter((s: any) => 
+      (s.material === 'Extrusion Rubber' || s.material === 'RN') && 
+      (s.section === 'Calendering' || s.section === 'Cutting')
     ).reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
 
     const tireBuildingScrap = scraps.filter((s: any) => 
@@ -112,12 +122,13 @@ export function RNReport() {
       s.section === 'Tire building'
     ).reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
 
-    const rn = extrusionScrap + tireBuildingScrap;
+    const rn = extrusionScrap + tireBuildingScrap + calenderingScrap;
     
-    // Point 2: RN ratio = (Extrusion gen + Tire building gen) / Extrusion usage
     const rate = extrusionUsage > 0 ? ((rn / extrusionUsage) * 100).toFixed(3) + '%' : '0%';
     
-    return { usage, rn, rate, extrusionUsage, tireBuildingUsage, extrusionScrap, tireBuildingScrap };
+    const calenderingRate = calenderingUsage > 0 ? ((calenderingScrap / calenderingUsage) * 100).toFixed(3) + '%' : '0%';
+    
+    return { usage, rn, rate, extrusionUsage, calenderingUsage, tireBuildingUsage, extrusionScrap, calenderingScrap, tireBuildingScrap, calenderingRate };
   }, [data]);
 
   const getTotalData = useCallback((d: Date) => {
@@ -125,13 +136,23 @@ export function RNReport() {
     const daySummaries = data?.summaries?.filter((s: any) => s.date === formattedDate) || [];
     const dayScraps = data?.scraps?.filter((s: any) => s.date === formattedDate) || [];
     
+    if (daySummaries.length === 0 && dayScraps.length === 0) {
+      return { usage: null, rn: null, rate: null, extrusionUsage: 0, calenderingUsage: 0, tireBuildingUsage: 0, extrusionScrap: 0, calenderingScrap: 0, tireBuildingScrap: 0 };
+    }
+
     const extrusionUsage = daySummaries.reduce((sum: number, s: any) => sum + (parseFloat(s.extrusionRubberUsage) || 0), 0);
+    const calenderingUsage = daySummaries.reduce((sum: number, s: any) => sum + (parseFloat(s.plyUsage) || 0), 0);
     const tireBuildingUsage = daySummaries.reduce((sum: number, s: any) => sum + (parseFloat(s.tireBuildingUsage) || 0), 0);
-    const usage = extrusionUsage + tireBuildingUsage;
+    const usage = extrusionUsage;
 
     const extrusionScrap = dayScraps.filter((s: any) => 
       (s.material === 'Extrusion Rubber' || s.material === 'RN') && 
       (s.section === 'Extrusion' || !s.section || s.section === 'Mixing')
+    ).reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
+
+    const calenderingScrap = dayScraps.filter((s: any) => 
+      (s.material === 'Extrusion Rubber' || s.material === 'RN') && 
+      (s.section === 'Calendering' || s.section === 'Cutting')
     ).reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
 
     const tireBuildingScrap = dayScraps.filter((s: any) => 
@@ -139,21 +160,27 @@ export function RNReport() {
       s.section === 'Tire building'
     ).reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
 
-    const rn = extrusionScrap + tireBuildingScrap;
+    const rn = extrusionScrap + tireBuildingScrap + calenderingScrap;
     
     const rate = extrusionUsage > 0 ? ((rn / extrusionUsage) * 100).toFixed(3) + '%' : '0%';
     
-    return { usage, rn, rate, extrusionUsage, tireBuildingUsage, extrusionScrap, tireBuildingScrap };
+    return { usage, rn, rate, extrusionUsage, calenderingUsage, tireBuildingUsage, extrusionScrap, calenderingScrap, tireBuildingScrap };
   }, [data]);
 
   const getMaterialData = useCallback((d: Date, materialName: string) => {
     const formattedDate = format(d, 'yyyy-MM-dd');
     const dayScraps = data?.scraps?.filter((s: any) => s.date === formattedDate && s.materialName === materialName) || [];
     
-    // For material-wise, we only show RN generation weight
+    if (dayScraps.length === 0) return null;
+
     const extrusionScrap = dayScraps.filter((s: any) => 
       (s.material === 'Extrusion Rubber' || s.material === 'RN') && 
       (s.section === 'Extrusion' || !s.section || s.section === 'Mixing')
+    ).reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
+
+    const calenderingScrap = dayScraps.filter((s: any) => 
+      (s.material === 'Extrusion Rubber' || s.material === 'RN') && 
+      (s.section === 'Calendering' || s.section === 'Cutting')
     ).reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
 
     const tireBuildingScrap = dayScraps.filter((s: any) => 
@@ -161,14 +188,14 @@ export function RNReport() {
       s.section === 'Tire building'
     ).reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
 
-    return extrusionScrap + tireBuildingScrap;
+    return extrusionScrap + calenderingScrap + tireBuildingScrap;
   }, [data]);
 
   const uniqueMaterials = useMemo(() => {
     if (!data?.scraps) return [];
     const materials = new Set<string>();
     data.scraps.forEach((s: any) => {
-      if (s.materialName && (s.material === 'Extrusion Rubber' || s.material === 'RN' || (s.material === 'Rubber' && s.section === 'Tire building'))) {
+      if (s.materialName && (s.material === 'Extrusion Rubber' || s.material === 'RN' || (s.material === 'Rubber' && (s.section === 'Tire building' || s.section === 'Calendering' || s.section === 'Cutting')))) {
         materials.add(s.materialName);
       }
     });
@@ -177,15 +204,18 @@ export function RNReport() {
 
   const chartData = useMemo(() => {
     if (!days.length) return [];
+    const today = startOfDay(new Date());
     return days.map(d => {
       const dData = getTotalData(d);
       const rateVal = parseFloat(dData.rate);
+      const isFuture = isAfter(startOfDay(d), today);
+      
       return {
         date: format(d, 'MM/dd'),
-        usage: dData.usage || 0,
-        rn: dData.rn || 0,
-        rate: isNaN(rateVal) ? 0 : rateVal,
-        target: targets?.rn_rate?.value || 95
+        usage: isFuture ? null : (dData.usage || 0),
+        rn: isFuture ? null : (dData.rn || 0),
+        rate: isFuture ? null : (isNaN(rateVal) ? 0 : rateVal),
+        target: isFuture ? null : (targets?.rn_rate?.value || 95)
       };
     });
   }, [days, getTotalData, targets]);
@@ -220,31 +250,65 @@ export function RNReport() {
   const copyAsPicture = useCallback(async () => {
     if (!tableRef.current) return;
     try {
-      // Create a temporary container to hold both table and charts for capture
-      const container = document.createElement('div');
-      container.style.padding = '20px';
-      container.style.background = '#ffffff';
-      container.style.width = '1200px'; // Fixed width for consistent capture
+      // To capture the full table even if scrolled, we temporarily remove constraints
+      const originalStyle = tableRef.current.getAttribute('style') || '';
+      const originalParentStyle = tableRef.current.parentElement?.getAttribute('style') || '';
       
-      const tableClone = tableRef.current.cloneNode(true) as HTMLDivElement;
-      tableClone.style.marginBottom = '20px';
-      container.appendChild(tableClone);
-      
-      if (chartRef.current) {
-        const chartClone = chartRef.current.cloneNode(true) as HTMLDivElement;
-        container.appendChild(chartClone);
+      // Force full width and height for capture
+      tableRef.current.style.width = 'max-content';
+      tableRef.current.style.height = 'auto';
+      tableRef.current.style.overflow = 'visible';
+      if (tableRef.current.parentElement) {
+        tableRef.current.parentElement.style.overflow = 'visible';
       }
-      
-      document.body.appendChild(container);
-      const blob = await toBlob(container, { backgroundColor: '#ffffff', pixelRatio: 2 });
-      document.body.removeChild(container);
+
+      const blob = await toBlob(tableRef.current, { 
+        backgroundColor: '#ffffff',
+        pixelRatio: 2
+      });
+
+      // Restore styles
+      tableRef.current.setAttribute('style', originalStyle);
+      if (tableRef.current.parentElement) {
+        tableRef.current.parentElement.setAttribute('style', originalParentStyle);
+      }
 
       if (!blob) return;
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
       setCopiedImage(true);
       setTimeout(() => setCopiedImage(false), 2000);
     } catch (err) {
-      console.error('Failed to copy picture', err);
+      console.error('Failed to copy table picture', err);
+    }
+  }, []);
+
+  const [copiedChartImage, setCopiedChartImage] = useState(false);
+
+  const copyChartsAsPicture = useCallback(async () => {
+    if (!chartRef.current) return;
+    try {
+      // To capture full charts, we temporarily remove constraints
+      const originalStyle = chartRef.current.getAttribute('style') || '';
+      
+      // Force height to auto and minimum width to ensure charts have space
+      chartRef.current.style.width = '1200px'; 
+      chartRef.current.style.height = 'auto';
+      chartRef.current.style.overflow = 'visible';
+
+      const blob = await toBlob(chartRef.current, { 
+        backgroundColor: '#ffffff',
+        pixelRatio: 2
+      });
+
+      // Restore styles
+      chartRef.current.setAttribute('style', originalStyle);
+
+      if (!blob) return;
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      setCopiedChartImage(true);
+      setTimeout(() => setCopiedChartImage(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy charts picture', err);
     }
   }, []);
 
@@ -292,7 +356,7 @@ export function RNReport() {
             </Button>
             <Button variant="outline" size="sm" onClick={copyAsPicture} title="Copy table as picture" className="h-10 font-bold">
               {copiedImage ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <ImageIcon className="h-4 w-4 mr-2" />}
-              <span className="hidden sm:inline">Picture</span>
+              <span className="hidden sm:inline">Copy Table</span>
             </Button>
             <Button variant="outline" size="sm" onClick={() => loadData(true)} disabled={loading} className="h-10 font-bold">
               <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
@@ -324,6 +388,10 @@ export function RNReport() {
     
     if (detailModal.shift) {
       dayScraps = dayScraps.filter((s: any) => s.shift === detailModal.shift);
+    }
+
+    if (detailModal.materialName) {
+      dayScraps = dayScraps.filter((s: any) => s.materialName === detailModal.materialName);
     }
 
     return dayScraps.filter((s: any) => 
@@ -382,10 +450,10 @@ export function RNReport() {
   const RowHeader = ({ title, subtitle, rowId }: { title: string, subtitle: string, rowId: string }) => (
     <TableCell 
       className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal relative group"
-      style={{ fontSize: rowFontSizes[rowId] ? `${rowFontSizes[rowId]}px` : undefined }}
+      style={{ fontSize: `${rowFontSizes[rowId] || 17}px` }}
     >
       <div className="text-sm pr-6" style={{ fontSize: 'inherit' }}>{title}</div>
-      <div className="text-xs text-gray-500 mt-0.5 pr-6" style={{ fontSize: rowFontSizes[rowId] ? `${rowFontSizes[rowId] * 0.8}px` : undefined }}>{subtitle}</div>
+      <div className="text-xs text-gray-500 mt-0.5 pr-6" style={{ fontSize: `${(rowFontSizes[rowId] || 17) * 0.8}px` }}>{subtitle}</div>
       
       <button 
         onClick={() => toggleRowVisibility(rowId)}
@@ -398,7 +466,7 @@ export function RNReport() {
       {isEditingFont && (
         <div className="absolute right-1 top-1/2 -translate-y-1/2 flex flex-col gap-1 bg-white/90 backdrop-blur-sm p-1 rounded border shadow-sm z-10">
           <button onClick={() => adjustFontSize(rowId, 1)} className="p-0.5 hover:bg-gray-100 rounded text-primary"><Plus className="h-3 w-3" /></button>
-          <span className="text-[10px] text-center font-bold">{rowFontSizes[rowId] || 14}</span>
+          <span className="text-[10px] text-center font-bold">{rowFontSizes[rowId] || 17}</span>
           <button onClick={() => adjustFontSize(rowId, -1)} className="p-0.5 hover:bg-gray-100 rounded text-primary"><Minus className="h-3 w-3" /></button>
         </div>
       )}
@@ -412,16 +480,26 @@ export function RNReport() {
     let displayValue = '';
     if (hasData) {
       if (typeof value === 'number') {
-        displayValue = value === 0 ? '0' : (rowId.includes('rate') ? value.toFixed(1) : value.toFixed(0));
+        if (Math.abs(value) < 0.01) {
+          displayValue = '';
+        } else {
+          displayValue = rowId.includes('rate') ? value.toFixed(1) : value.toFixed(0);
+          if (displayValue === '0' || displayValue === '0.0') displayValue = '';
+        }
       } else {
-        displayValue = value || '0';
+        displayValue = value || '';
+        if (displayValue === '0' || displayValue === '0%' || displayValue === '0.0%') {
+          displayValue = '';
+        }
         if (rowId.includes('rate') && displayValue.includes('%')) {
-          displayValue = parseFloat(displayValue).toFixed(1) + '%';
+          const numeric = parseFloat(displayValue);
+          if (isNaN(numeric) || numeric < 0.01) displayValue = '';
+          else displayValue = numeric.toFixed(1) + '%';
         }
       }
     }
 
-    const isBelowTarget = rowId.includes('rate') && hasData && parseFloat(displayValue) < (targets?.rn_rate?.value || 95);
+    const isOverTarget = rowId.includes('rate') && hasData && targets?.rn_rate?.value > 0 && parseFloat(displayValue) > targets.rn_rate.value;
 
     return (
       <TableCell 
@@ -429,17 +507,50 @@ export function RNReport() {
         className={cn(
           "border border-gray-300 text-center transition-colors",
           hasData && "cursor-pointer hover:bg-black/5",
-          isBelowTarget && "text-red-600 font-bold"
+          isOverTarget && "text-red-600 font-bold"
         )}
-        style={{ fontSize: rowFontSizes[rowId] ? `${rowFontSizes[rowId]}px` : undefined }}
+        style={{ fontSize: `${rowFontSizes[rowId] || 17}px` }}
         onDoubleClick={() => {
           if (hasData) {
-            setDetailModal({ date: d, shift });
+            setDetailModal({ date: d, shift, materialName });
           }
         }}
       >
         {displayValue}
       </TableCell>
+    );
+  };
+
+  const renderSummaryCells = (values: any[], rowId: string) => {
+    const numericValues = values
+      .map(v => (typeof v === 'number' ? v : parseFloat(v)))
+      .filter(v => v !== null && v !== undefined && !isNaN(v));
+    
+    const sum = numericValues.reduce((acc, v) => acc + v, 0);
+    const avg = numericValues.length > 0 ? sum / numericValues.length : 0;
+
+    const isRate = rowId.includes('rate');
+    const displaySum = sum.toFixed(0);
+    const displayAvg = isRate ? avg.toFixed(1) + '%' : avg.toFixed(0);
+    const isOverTarget = isRate && targets?.rn_rate?.value > 0 && avg > targets.rn_rate.value;
+
+    if (isRate) {
+      return (
+        <TableCell colSpan={2} className={cn("border border-gray-300 text-center font-bold bg-gray-50", isOverTarget && "text-red-600")} style={{ fontSize: `${rowFontSizes[rowId] || 17}px` }}>
+          {displayAvg}
+        </TableCell>
+      );
+    }
+
+    return (
+      <>
+        <TableCell className="border border-gray-300 text-center font-bold bg-gray-50" style={{ fontSize: `${rowFontSizes[rowId] || 17}px` }}>
+          {displaySum}
+        </TableCell>
+        <TableCell className="border border-gray-300 text-center font-bold bg-gray-50" style={{ fontSize: `${rowFontSizes[rowId] || 17}px` }}>
+          {displayAvg}
+        </TableCell>
+      </>
     );
   };
 
@@ -467,7 +578,35 @@ export function RNReport() {
               </Button>
             </div>
             <CardTitle className="text-2xl text-center flex-1 whitespace-nowrap">2026 RN Generation Details Report</CardTitle>
-            <div className="flex items-center gap-2 flex-1 justify-end">
+            <div className="flex items-center gap-2 flex-1 justify-end flex-wrap">
+              <div className="flex items-center gap-2">
+                <Select value={selectedWeek.toString()} onValueChange={(v) => setSelectedWeek(parseInt(v))}>
+                  <SelectTrigger className="w-[120px] h-10 font-bold">
+                    <SelectValue placeholder="Select Week" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 52 }, (_, i) => i + 1).map((w) => (
+                      <SelectItem key={w} value={w.toString()}>
+                        Week {w}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={numWeeks.toString()} onValueChange={(v) => setNumWeeks(parseInt(v))}>
+                  <SelectTrigger className="w-[80px] h-10 font-bold">
+                    <SelectValue placeholder="Weeks" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <SelectItem key={n} value={n.toString()}>
+                        {n} {n === 1 ? 'Week' : 'Weeks'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" className="h-10 font-bold">
@@ -511,6 +650,12 @@ export function RNReport() {
                         {format(d, 'M-d')}
                       </TableHead>
                     ))}
+                    <TableHead className="border border-gray-300 bg-blue-50 font-bold text-center min-w-[100px]">
+                      TOTAL SUM
+                    </TableHead>
+                    <TableHead className="border border-gray-300 bg-blue-50 font-bold text-center min-w-[100px]">
+                      AVERAGE
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -519,20 +664,23 @@ export function RNReport() {
                       <React.Fragment key={shift}>
                         {!hiddenRows.includes(`rn_${shift}_usage`) && (
                           <TableRow>
-                            <RowHeader title={`Shift ${shift} Usage (kg)`} subtitle={`班次 ${shift} 使用重量`} rowId={`rn_${shift}_usage`} />
+                            <RowHeader title={`Shift ${shift} Usage (kg)`} subtitle={`班次 ${shift} 擠出使用重量`} rowId={`rn_${shift}_usage`} />
                             {days.map(d => renderCell(d, getShiftData(d, shift).usage, `rn_${shift}_usage`, shift))}
+                            {renderSummaryCells(days.map(d => getShiftData(d, shift).usage), `rn_${shift}_usage`)}
                           </TableRow>
                         )}
                         {!hiddenRows.includes(`rn_${shift}_scrap`) && (
                           <TableRow>
                             <RowHeader title={`Shift ${shift} RN (kg)`} subtitle={`班次 ${shift} RN產生重量`} rowId={`rn_${shift}_scrap`} />
                             {days.map(d => renderCell(d, getShiftData(d, shift).rn, `rn_${shift}_scrap`, shift))}
+                            {renderSummaryCells(days.map(d => getShiftData(d, shift).rn), `rn_${shift}_scrap`)}
                           </TableRow>
                         )}
                         {!hiddenRows.includes(`rn_${shift}_rate`) && (
                           <TableRow className="bg-[#e2f0d9]">
                             <RowHeader title={`Shift ${shift} Rate (%)`} subtitle={`班次 ${shift} 回收率`} rowId={`rn_${shift}_rate`} />
                             {days.map(d => renderCell(d, getShiftData(d, shift).rate, `rn_${shift}_rate`, shift))}
+                            {renderSummaryCells(days.map(d => getShiftData(d, shift).rate), `rn_${shift}_rate`)}
                           </TableRow>
                         )}
                       </React.Fragment>
@@ -542,25 +690,29 @@ export function RNReport() {
                       <TableRow key={mat}>
                         <RowHeader title={mat} subtitle="膠料類型" rowId={`rn_mat_${mat}`} />
                         {days.map(d => renderCell(d, getMaterialData(d, mat), `rn_mat_${mat}`, undefined, mat))}
+                        {renderSummaryCells(days.map(d => getMaterialData(d, mat)), `rn_mat_${mat}`)}
                       </TableRow>
                     ))
                   )}
                   {!hiddenRows.includes("rn_total_usage") && (
                     <TableRow className="bg-gray-100 font-bold">
-                      <RowHeader title="TOTAL Usage (kg)" subtitle="總使用重量" rowId="rn_total_usage" />
+                      <RowHeader title="TOTAL Usage (kg)" subtitle="總計擠出使用重量" rowId="rn_total_usage" />
                       {days.map(d => renderCell(d, getTotalData(d).usage, "rn_total_usage"))}
+                      {renderSummaryCells(days.map(d => getTotalData(d).usage), "rn_total_usage")}
                     </TableRow>
                   )}
                   {!hiddenRows.includes("rn_total_scrap") && (
                     <TableRow className="bg-gray-100 font-bold">
                       <RowHeader title="TOTAL RN (kg)" subtitle="總RN產生重量" rowId="rn_total_scrap" />
                       {days.map(d => renderCell(d, getTotalData(d).rn, "rn_total_scrap"))}
+                      {renderSummaryCells(days.map(d => getTotalData(d).rn), "rn_total_scrap")}
                     </TableRow>
                   )}
                   {!hiddenRows.includes("rn_total_rate") && (
                     <TableRow className="bg-[#ddebf7] font-bold">
                       <RowHeader title="TOTAL Rate (%)" subtitle="總回收率" rowId="rn_total_rate" />
                       {days.map(d => renderCell(d, getTotalData(d).rate, "rn_total_rate"))}
+                      {renderSummaryCells(days.map(d => getTotalData(d).rate), "rn_total_rate")}
                     </TableRow>
                   )}
                 </TableBody>
@@ -570,8 +722,15 @@ export function RNReport() {
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" ref={chartRef}>
-        <Card>
+      <div className="relative">
+        <div className="absolute top-0 right-0 z-10 flex gap-2">
+          <Button variant="outline" size="sm" onClick={copyChartsAsPicture} title="Copy charts as picture" className="font-bold">
+            {copiedChartImage ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <ImageIcon className="h-4 w-4 mr-2" />}
+            <span className="hidden sm:inline">Copy Charts</span>
+          </Button>
+        </div>
+        <div className="grid grid-cols-1 gap-6 pt-10" ref={chartRef}>
+          <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-primary" />
@@ -581,19 +740,26 @@ export function RNReport() {
           <CardContent>
             <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 25 }} barCategoryGap="25%" barGap={8}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip formatter={(v: number) => [`${(v/1000).toFixed(0)} t`, '']} />
-                  <Legend />
-                  <Line type="monotone" dataKey="usage" name="Usage (t)" stroke="#2563eb" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }}>
-                    <LabelList dataKey="usage" position="top" formatter={(v: number) => (v/1000).toFixed(0)} style={{ fontSize: '10px', fill: '#2563eb', fontWeight: 'bold' }} />
-                  </Line>
-                  <Line type="monotone" dataKey="rn" name="RN (t)" stroke="#dc2626" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }}>
-                    <LabelList dataKey="rn" position="top" formatter={(v: number) => (v/1000).toFixed(0)} style={{ fontSize: '10px', fill: '#dc2626', fontWeight: 'bold' }} />
-                  </Line>
-                </LineChart>
+                  <XAxis dataKey="date" angle={-45} textAnchor="end" height={60} tick={{ fontSize: 14 }} />
+                  <YAxis tick={{ fontSize: 14 }} />
+                  <Tooltip formatter={(v: number) => [`${v.toFixed(0)} kg`, '']} />
+                  <Legend verticalAlign="top" align="right" wrapperStyle={{ paddingBottom: '20px', fontSize: '14px' }} />
+                  <Bar dataKey="usage" name="Usage (kg)" fill="#2563eb" radius={[4, 4, 0, 0]}>
+                    <LabelList dataKey="usage" position="top" formatter={(v: number) => v.toFixed(0)} style={{ fontSize: '14px', fill: '#2563eb', fontWeight: 'bold' }} />
+                  </Bar>
+                  <Bar dataKey="rn" name="RN (kg)" fill="#dc2626" radius={[4, 4, 0, 0]}>
+                    <LabelList dataKey="rn" position="top" formatter={(v: number) => v.toFixed(0)} style={{ fontSize: '14px', fill: '#dc2626', fontWeight: 'bold' }} />
+                    <LabelList 
+                      dataKey="rate" 
+                      position="top" 
+                      offset={25} 
+                      formatter={(v: number) => v > 0 ? `${v.toFixed(1)}%` : ''} 
+                      style={{ fontSize: '14px', fill: '#16a34a', fontWeight: 'bold' }} 
+                    />
+                  </Bar>
+                </BarChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
@@ -609,14 +775,19 @@ export function RNReport() {
           <CardContent>
             <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 25 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="date" />
-                  <YAxis unit="%" domain={[0, 100]} />
+                  <XAxis dataKey="date" angle={-45} textAnchor="end" height={60} tick={{ fontSize: 14 }} />
+                  <YAxis 
+                    unit="%" 
+                    domain={['dataMin - 1', 'dataMax + 1']} 
+                    tick={{ fontSize: 14 }} 
+                    tickFormatter={(v) => Math.round(v).toString()}
+                  />
                   <Tooltip formatter={(value: number) => [`${value.toFixed(1)}%`, 'Rate']} />
-                  <Legend />
+                  <Legend verticalAlign="top" align="right" wrapperStyle={{ paddingBottom: '20px', fontSize: '14px' }} />
                   <Line type="monotone" dataKey="rate" name="RN Rate" stroke="#16a34a" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }}>
-                    <LabelList dataKey="rate" position="top" formatter={(v: number) => v.toFixed(1) + '%'} style={{ fontSize: '10px', fill: '#16a34a', fontWeight: 'bold' }} />
+                    <LabelList dataKey="rate" position="top" formatter={(v: number) => v.toFixed(1) + '%'} style={{ fontSize: '14px', fill: '#16a34a', fontWeight: 'bold' }} />
                   </Line>
                   <Line type="stepAfter" dataKey="target" name="Target" stroke="#000000" strokeDasharray="5 5" strokeWidth={1} dot={false} />
                 </LineChart>
@@ -624,6 +795,7 @@ export function RNReport() {
             </div>
           </CardContent>
         </Card>
+        </div>
       </div>
 
       {detailModal && (
@@ -658,6 +830,7 @@ export function RNReport() {
                       <TableHead className="font-bold border">Shift</TableHead>
                       <TableHead className="font-bold border text-center">Extrusion Usage (kg)</TableHead>
                       <TableHead className="font-bold border text-center">Extrusion RN (kg)</TableHead>
+                      <TableHead className="font-bold border text-center">Calendering RN (kg)</TableHead>
                       <TableHead className="font-bold border text-center">Tire Building RN (kg)</TableHead>
                       <TableHead className="font-bold border text-center">RN Rate (%)</TableHead>
                     </TableRow>
@@ -670,6 +843,7 @@ export function RNReport() {
                           <TableCell className="font-bold border">{shift}</TableCell>
                           <TableCell className="text-center border">{s.extrusionUsage.toFixed(0)}</TableCell>
                           <TableCell className="text-center border">{s.extrusionScrap.toFixed(1)}</TableCell>
+                          <TableCell className="text-center border">{s.calenderingScrap.toFixed(1)}</TableCell>
                           <TableCell className="text-center border">{s.tireBuildingScrap.toFixed(1)}</TableCell>
                           <TableCell className="text-center border font-medium">{s.rate}</TableCell>
                         </TableRow>
@@ -684,6 +858,7 @@ export function RNReport() {
                             <>
                               <TableCell className="text-center border">{s.extrusionUsage.toFixed(0)}</TableCell>
                               <TableCell className="text-center border">{s.extrusionScrap.toFixed(1)}</TableCell>
+                              <TableCell className="text-center border">{s.calenderingScrap.toFixed(1)}</TableCell>
                               <TableCell className="text-center border">{s.tireBuildingScrap.toFixed(1)}</TableCell>
                               <TableCell className="text-center border text-primary">{s.rate}</TableCell>
                             </>
@@ -704,13 +879,13 @@ export function RNReport() {
                 <Table className="border">
                   <TableHeader>
                     <TableRow>
-                      {['Date', 'Shift', 'Section', 'Material Type', 'Material Name', 'Weight (kg)', 'Reason', 'Picture', 'Recorded At'].map((head, idx) => (
+                      {['Date', 'Shift', 'Section', 'Material Type', 'Material Name', 'Weight (kg)', 'Main Reason', 'Reason', 'Picture', 'Recorded At'].map((head, idx) => (
                         <TableHead 
                           key={idx} 
                           className={cn("cursor-pointer hover:bg-gray-100 transition-colors", highlightedCols.includes(idx) && "bg-yellow-100 text-yellow-900 font-bold")}
                           onClick={() => setHighlightedCols(prev => prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx])}
                         >
-                          {head === 'Reason' ? 'Reason for RN' : head}
+                          {head}
                         </TableHead>
                       ))}
                     </TableRow>
@@ -728,8 +903,9 @@ export function RNReport() {
                         <TableCell className={cn("font-medium", highlightedCols.includes(3) && "bg-yellow-50")}>{scrap.material}</TableCell>
                         <TableCell className={cn(highlightedCols.includes(4) && "bg-yellow-50")}>{scrap.materialName || '-'}</TableCell>
                         <TableCell className={cn(highlightedCols.includes(5) && "bg-yellow-50")}>{typeof scrap.weight === 'number' ? (scrap.weight === 0 ? '0' : scrap.weight.toFixed(1)) : (scrap.weight || '0')}</TableCell>
-                        <TableCell className={cn(highlightedCols.includes(6) && "bg-yellow-50")}>{scrap.reason}</TableCell>
-                        <TableCell className={cn(highlightedCols.includes(7) && "bg-yellow-50")}>
+                        <TableCell className={cn(highlightedCols.includes(6) && "bg-yellow-50")}>{scrap.mainReason || '-'}</TableCell>
+                        <TableCell className={cn(highlightedCols.includes(7) && "bg-yellow-50")}>{scrap.reason}</TableCell>
+                        <TableCell className={cn(highlightedCols.includes(8) && "bg-yellow-50")}>
                           {scrap.imageUrl ? (
                             <a href={scrap.imageUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
                               View Image
@@ -738,7 +914,7 @@ export function RNReport() {
                             <span className="text-muted-foreground text-sm">No image</span>
                           )}
                         </TableCell>
-                        <TableCell className={cn("text-muted-foreground whitespace-nowrap", highlightedCols.includes(8) && "bg-yellow-50")}>{formatToIST(scrap.timestamp || scrap.time || '-')}</TableCell>
+                        <TableCell className={cn("text-muted-foreground whitespace-nowrap", highlightedCols.includes(9) && "bg-yellow-50")}>{formatToIST(scrap.timestamp || scrap.time || '-')}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

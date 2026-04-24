@@ -7,6 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/src/components/ui/pop
 import { Button } from '@/src/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/components/ui/select';
 import { fetchRangeData, fetchTargets, getWebAppUrl } from '@/src/lib/api';
 import { cn } from '@/src/lib/utils';
 import { DateRange } from 'react-day-picker';
@@ -14,11 +15,12 @@ import { useSidebar } from '@/src/lib/SidebarContext';
 import { useData } from '@/src/lib/DataContext';
 
 export function MainReport() {
-  const [date, setDate] = useState<DateRange | undefined>({
-    from: startOfWeek(new Date(), { weekStartsOn: 1 }),
-    to: endOfWeek(new Date(), { weekStartsOn: 1 }),
-  });
-  const { data, targets, configs, loading, error, loadData, loadTargets, updateTargets, saveTargetsToSheet, updateScrapReasonInSheet, isSyncingTargets } = useData();
+  const { 
+    data, targets, configs, loading, error, loadData, loadTargets, updateTargets, saveTargetsToSheet, updateScrapReasonInSheet, isSyncingTargets,
+    globalDateRange: date, setGlobalDateRange: setDate,
+    selectedWeek, setSelectedWeek,
+    numWeeks, setNumWeeks
+  } = useData();
   const [copiedText, setCopiedText] = useState(false);
   const [copiedImage, setCopiedImage] = useState(false);
   
@@ -52,7 +54,7 @@ export function MainReport() {
   const adjustFontSize = (rowId: string, delta: number) => {
     setRowFontSizes(prev => ({
       ...prev,
-      [rowId]: Math.max(8, (prev[rowId] || 14) + delta)
+      [rowId]: Math.max(8, (prev[rowId] || 17) + delta)
     }));
   };
 
@@ -140,7 +142,7 @@ export function MainReport() {
       filtered = dayScraps.filter((s: any) => 
         s.material === 'Extrusion Rubber' || 
         s.material === 'RN' || 
-        (s.material === 'Rubber' && s.section === 'Tire building')
+        (s.material === 'Rubber' && (s.section === 'Tire building' || s.section === 'Calendering' || s.section === 'Cutting'))
       );
     }
     
@@ -186,13 +188,13 @@ export function MainReport() {
       // RN
       days.map(d => {
         const s = getSummaryForDate(d);
-        // Point 1: Usage includes both extrusion rubber and tire building
-        return (Number(s?.extrusionRubberUsage || 0) + Number(s?.tireBuildingUsage || 0)).toString();
+        // Point 1: Usage includes only extrusion
+        return (Number(s?.extrusionRubberUsage || 0)).toString();
       }),
       days.map(d => getCustomScrapForDate(d, 'RN') || '0'),
       days.map(d => {
         const s = getSummaryForDate(d);
-        // Point 2: RN ratio = (Extrusion gen + Tire building gen) / Extrusion usage
+        // Point 2: RN ratio = Total Scraps / Extrusion Usage
         return calculateRate(getCustomScrapForDate(d, 'RN'), Number(s?.extrusionRubberUsage || 0));
       }),
     ];
@@ -207,10 +209,28 @@ export function MainReport() {
   const copyAsPicture = async () => {
     if (!tableRef.current) return;
     try {
+      // To capture the full table even if scrolled, we temporarily remove constraints
+      const originalStyle = tableRef.current.getAttribute('style') || '';
+      const originalParentStyle = tableRef.current.parentElement?.getAttribute('style') || '';
+      
+      // Force full width and height for capture
+      tableRef.current.style.width = 'max-content';
+      tableRef.current.style.height = 'auto';
+      tableRef.current.style.overflow = 'visible';
+      if (tableRef.current.parentElement) {
+        tableRef.current.parentElement.style.overflow = 'visible';
+      }
+
       const blob = await toBlob(tableRef.current, { 
         backgroundColor: '#ffffff',
         pixelRatio: 2
       });
+
+      // Restore styles
+      tableRef.current.setAttribute('style', originalStyle);
+      if (tableRef.current.parentElement) {
+        tableRef.current.parentElement.setAttribute('style', originalParentStyle);
+      }
       
       if (!blob) return;
 
@@ -257,7 +277,7 @@ export function MainReport() {
       return dayScraps.filter((s: any) => 
         s.material === 'Extrusion Rubber' || 
         s.material === 'RN' || 
-        (s.material === 'Rubber' && s.section === 'Tire building')
+        (s.material === 'Rubber' && (s.section === 'Tire building' || s.section === 'Calendering' || s.section === 'Cutting'))
       );
     }
     return [];
@@ -394,9 +414,9 @@ export function MainReport() {
         key={d.toISOString()} 
         className={cn(
           "border border-gray-300 text-center cursor-pointer hover:bg-black/5 transition-colors",
-          isOverTarget && "bg-red-100 text-red-700 font-bold"
+          isOverTarget && "text-red-600 font-bold"
         )}
-        style={{ fontSize: rowFontSizes[rowId] ? `${rowFontSizes[rowId]}px` : undefined }}
+        style={{ fontSize: `${rowFontSizes[rowId] || 17}px` }}
         onDoubleClick={() => {
           if (isUsageRow) {
             setUsageDetailModal({ date: d, type });
@@ -414,15 +434,15 @@ export function MainReport() {
   const RowHeader = ({ title, subtitle, rowId }: { title: string, subtitle: string, rowId: string }) => (
     <TableCell 
       className="border border-gray-300 font-medium leading-tight py-2 min-w-[150px] max-w-[250px] whitespace-normal relative group"
-      style={{ fontSize: rowFontSizes[rowId] ? `${rowFontSizes[rowId]}px` : undefined }}
+      style={{ fontSize: `${rowFontSizes[rowId] || 17}px` }}
     >
       <div className="text-sm" style={{ fontSize: 'inherit' }}>{title}</div>
-      <div className="text-xs text-gray-500 mt-0.5" style={{ fontSize: rowFontSizes[rowId] ? `${rowFontSizes[rowId] * 0.8}px` : undefined }}>{subtitle}</div>
+      <div className="text-xs text-gray-500 mt-0.5" style={{ fontSize: `${(rowFontSizes[rowId] || 17) * 0.8}px` }}>{subtitle}</div>
       
       {isEditingFont && (
         <div className="absolute right-1 top-1/2 -translate-y-1/2 flex flex-col gap-1 bg-white/90 backdrop-blur-sm p-1 rounded border shadow-sm z-10">
           <button onClick={() => adjustFontSize(rowId, 1)} className="p-0.5 hover:bg-gray-100 rounded text-primary"><Plus className="h-3 w-3" /></button>
-          <span className="text-[10px] text-center font-bold">{rowFontSizes[rowId] || 14}</span>
+          <span className="text-[10px] text-center font-bold">{rowFontSizes[rowId] || 17}</span>
           <button onClick={() => adjustFontSize(rowId, -1)} className="p-0.5 hover:bg-gray-100 rounded text-primary"><Minus className="h-3 w-3" /></button>
         </div>
       )}
@@ -530,7 +550,35 @@ export function MainReport() {
           <CardHeader className="flex flex-row items-center justify-between pb-2 relative">
             <div className="flex-1" />
             <CardTitle className="text-2xl text-center flex-1 whitespace-nowrap">2026 MRI Production Weekly Report</CardTitle>
-            <div className="flex items-center gap-2 flex-1 justify-end">
+            <div className="flex items-center gap-2 flex-1 justify-end flex-wrap">
+              <div className="flex items-center gap-2">
+                <Select value={selectedWeek.toString()} onValueChange={(v) => setSelectedWeek(parseInt(v))}>
+                  <SelectTrigger className="w-[120px] h-10 font-bold">
+                    <SelectValue placeholder="Select Week" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 52 }, (_, i) => i + 1).map((w) => (
+                      <SelectItem key={w} value={w.toString()}>
+                        Week {w}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={numWeeks.toString()} onValueChange={(v) => setNumWeeks(parseInt(v))}>
+                  <SelectTrigger className="w-[80px] h-10 font-bold">
+                    <SelectValue placeholder="Weeks" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <SelectItem key={n} value={n.toString()}>
+                        {n} {n === 1 ? 'Week' : 'Weeks'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" className="h-10 font-bold">
@@ -648,7 +696,7 @@ export function MainReport() {
 
                 {/* RN (Rubber Recycling) */}
                 <TableRow>
-                  <RowHeader title="Extrusion rubber usage (kg)" subtitle="押出膠料使用重量(kg)" rowId="rn_usage" />
+                  <RowHeader title="Extrusion rubber usage (kg)" subtitle="擠出膠料使用重量(kg)" rowId="rn_usage" />
                   {days.map((d) => {
                     const summary = getSummaryForDate(d);
                     return renderCell(d, 'RN', summary ? (summary.extrusionRubberUsage ?? 0) : null, 'rn_usage');
@@ -662,7 +710,8 @@ export function MainReport() {
                   <RowHeader title="Rubber recovery rate (%)" subtitle="膠料回收率(%)" rowId="rn_rate" />
                   {days.map((d) => {
                     const summary = getSummaryForDate(d);
-                    return renderCell(d, 'RN', calculateRate(getCustomScrapForDate(d, 'RN'), summary ? (summary.extrusionRubberUsage ?? 0) : null), 'rn_rate');
+                    const usageTotal = summary ? (summary.extrusionRubberUsage ?? 0) : 0;
+                    return renderCell(d, 'RN', calculateRate(getCustomScrapForDate(d, 'RN'), usageTotal || null), 'rn_rate');
                   })}
                 </TableRow>
               </TableBody>
@@ -706,7 +755,7 @@ export function MainReport() {
                 <Table className="border">
                   <TableHeader>
                     <TableRow>
-                      {['Date', 'Shift', 'Section', 'Material Type', 'Material Name', 'Weight (kg)', 'Reason', 'Picture', 'Recorded At'].map((head, idx) => (
+                      {['Date', 'Shift', 'Section', 'Material Type', 'Material Name', 'Weight (kg)', 'Main Reason', 'Reason', 'Picture', 'Recorded At'].map((head, idx) => (
                         <TableHead 
                           key={idx} 
                           className={cn("cursor-pointer hover:bg-gray-100 transition-colors", highlightedCols.includes(idx) && "bg-yellow-100 text-yellow-900 font-bold")}
@@ -731,6 +780,9 @@ export function MainReport() {
                         <TableCell className={cn(highlightedCols.includes(4) && "bg-yellow-50")}>{scrap.materialName || '-'}</TableCell>
                         <TableCell className={cn(highlightedCols.includes(5) && "bg-yellow-50")}>{typeof scrap.weight === 'number' ? (scrap.weight === 0 ? '0' : scrap.weight.toFixed(1)) : (scrap.weight || '0')}</TableCell>
                         <TableCell className={cn(highlightedCols.includes(6) && "bg-yellow-50")}>
+                          {scrap.mainReason || '-'}
+                        </TableCell>
+                        <TableCell className={cn(highlightedCols.includes(7) && "bg-yellow-50")}>
                           {editingScrap === scrap.timestamp ? (
                             <div className="flex items-center gap-2">
                               <input 
@@ -773,7 +825,7 @@ export function MainReport() {
                             </div>
                           )}
                         </TableCell>
-                        <TableCell className={cn(highlightedCols.includes(7) && "bg-yellow-50")}>
+                        <TableCell className={cn(highlightedCols.includes(8) && "bg-yellow-50")}>
                           {scrap.imageUrl ? (
                             <a href={scrap.imageUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
                               View Image
@@ -782,7 +834,7 @@ export function MainReport() {
                             <span className="text-muted-foreground text-sm">No image</span>
                           )}
                         </TableCell>
-                        <TableCell className={cn("text-muted-foreground whitespace-nowrap", highlightedCols.includes(8) && "bg-yellow-50")}>{formatToIST(scrap.timestamp || scrap.time || '-')}</TableCell>
+                        <TableCell className={cn("text-muted-foreground whitespace-nowrap", highlightedCols.includes(9) && "bg-yellow-50")}>{formatToIST(scrap.timestamp || scrap.time || '-')}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
