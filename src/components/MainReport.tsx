@@ -539,6 +539,115 @@ export function MainReport() {
     setEditReason(scrap.reason || '');
   };
 
+  const monthlyTotals = useMemo(() => {
+    let bicUsage = 0, bicScrap = 0;
+    let plyUsage = 0, plyScrap = 0;
+    let rubberUsage = 0, rubberScrap = 0;
+    let rnUsage = 0, rnScrap = 0;
+    let hasData = false;
+
+    if (!date?.from) {
+      return {
+        hasData,
+        bicUsage, bicScrap,
+        plyUsage, plyScrap,
+        rubberUsage, rubberScrap,
+        rnUsage, rnScrap
+      };
+    }
+
+    const monthStart = startOfMonth(date.from);
+    const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+    const allDaysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+
+    allDaysInMonth.forEach(d => {
+      const summary = getSummaryForDate(d);
+      const dayBicScrap = getCustomScrapForDate(d, 'BIC');
+      const dayPlyScrap = getCustomScrapForDate(d, 'PLY_CHAFER');
+      const dayRubberScrap = getCustomScrapForDate(d, 'RUBBER_MIXING');
+      const dayRnScrap = getCustomScrapForDate(d, 'RN');
+
+      if (summary || dayBicScrap !== null || dayPlyScrap !== null || dayRubberScrap !== null || dayRnScrap !== null) {
+        hasData = true;
+      }
+
+      bicUsage += summary?.bicUsage || 0;
+      plyUsage += summary?.plyUsage || 0;
+      rubberUsage += summary?.mixingRubberUsage || summary?.rubberUsage || 0;
+      rnUsage += summary?.extrusionRubberUsage || 0;
+
+      bicScrap += dayBicScrap || 0;
+      plyScrap += dayPlyScrap || 0;
+      rubberScrap += dayRubberScrap || 0;
+      rnScrap += dayRnScrap || 0;
+    });
+
+    return {
+      hasData,
+      bicUsage, bicScrap,
+      plyUsage, plyScrap,
+      rubberUsage, rubberScrap,
+      rnUsage, rnScrap
+    };
+  }, [date, data]);
+
+  const renderTotalCell = (type: 'BIC' | 'PLY_CHAFER' | 'RUBBER_MIXING' | 'RN', rowType: 'usage' | 'scrap' | 'rate', rowId: string) => {
+    if (!monthlyTotals.hasData) return <TableCell className="border border-gray-300 bg-[#f8f9fa] text-center min-w-[100px]"></TableCell>;
+
+    let value: number | string | null = null;
+    let usage = 0;
+    let scrap = 0;
+
+    switch (type) {
+      case 'BIC': usage = monthlyTotals.bicUsage; scrap = monthlyTotals.bicScrap; break;
+      case 'PLY_CHAFER': usage = monthlyTotals.plyUsage; scrap = monthlyTotals.plyScrap; break;
+      case 'RUBBER_MIXING': usage = monthlyTotals.rubberUsage; scrap = monthlyTotals.rubberScrap; break;
+      case 'RN': usage = monthlyTotals.rnUsage; scrap = monthlyTotals.rnScrap; break;
+    }
+
+    if (rowType === 'usage') value = usage;
+    else if (rowType === 'scrap') value = scrap;
+    else if (rowType === 'rate') {
+      value = calculateRate(scrap, usage);
+    }
+
+    let displayValue: React.ReactNode = '';
+    let isOverTarget = false;
+    
+    if (value === null || value === undefined) {
+      displayValue = '';
+    } else if (typeof value === 'number') {
+      displayValue = value === 0 ? '0' : (rowType === 'usage' ? value.toFixed(0) : value.toFixed(1));
+    } else if (typeof value === 'string') {
+      if (value === '0' || value === '0%' || value === '0.000%') {
+        displayValue = '0';
+      } else {
+        displayValue = value;
+        // Check rate targets
+        if (rowId.endsWith('_rate')) {
+          const numValue = parseFloat(value);
+          const target = targets[rowId];
+          if (target && target.period !== 'not_use' && target.value > 0 && !isNaN(numValue)) {
+            // Rate is considered over target if greater, unless we explicitly configure RN rate differently.
+            // Keeping it consistent with daily logic.
+            isOverTarget = numValue > target.value;
+          }
+        }
+      }
+    }
+
+    return (
+      <TableCell className={cn(
+        "border border-gray-300 text-center font-bold bg-[#f8f9fa] text-blue-900 min-w-[100px]",
+        isOverTarget && "text-red-600 font-bold bg-red-50"
+      )}
+      style={{ fontSize: `${rowFontSizes[rowId] || 17}px` }}
+      >
+        {displayValue}
+      </TableCell>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {error && (
@@ -627,6 +736,10 @@ export function MainReport() {
                     <div>Date</div>
                     <div className="text-sm font-normal text-gray-600">日期</div>
                   </TableHead>
+                  <TableHead className="border border-gray-300 bg-[#f8f9fa] font-semibold text-center min-w-[100px] text-lg text-blue-800">
+                    <div>Monthly Total</div>
+                    <div className="text-sm font-normal text-slate-500">月度總計</div>
+                  </TableHead>
                   {days.map((d, i) => (
                     <TableHead key={i} className="border border-gray-300 bg-gray-50 font-semibold text-center min-w-[80px] text-lg">
                       {format(d, 'M-d')}
@@ -637,6 +750,7 @@ export function MainReport() {
               <TableBody>
                 <TableRow>
                   <RowHeader title="BIC usage weight (kg)" subtitle="鋼絲使用重量(kg)" rowId="bic_usage" />
+                  {renderTotalCell('BIC', 'usage', 'bic_usage')}
                   {days.map((d) => {
                     const summary = getSummaryForDate(d);
                     return renderCell(d, 'BIC', summary ? (summary.bicUsage ?? 0) : null, 'bic_usage');
@@ -644,10 +758,12 @@ export function MainReport() {
                 </TableRow>
                 <TableRow>
                   <RowHeader title="BIC scrapping weight (kg)" subtitle="鋼絲報廢公斤數(kg)" rowId="bic_scrap" />
+                  {renderTotalCell('BIC', 'scrap', 'bic_scrap')}
                   {days.map((d) => renderCell(d, 'BIC', getCustomScrapForDate(d, 'BIC'), 'bic_scrap'))}
                 </TableRow>
                 <TableRow className="bg-[#e2f0d9]">
                   <RowHeader title="BIC scrap rate (%)" subtitle="鋼絲報廢率(%)" rowId="bic_rate" />
+                  {renderTotalCell('BIC', 'rate', 'bic_rate')}
                   {days.map((d) => {
                     const summary = getSummaryForDate(d);
                     return renderCell(d, 'BIC', calculateRate(getCustomScrapForDate(d, 'BIC'), summary ? (summary.bicUsage ?? 0) : null), 'bic_rate');
@@ -657,6 +773,7 @@ export function MainReport() {
                 {/* PLY + Chafer */}
                 <TableRow>
                   <RowHeader title="PLY & Chafer usage weight (kg)" subtitle="簾紗及防擦布使用重量(kg)" rowId="ply_usage" />
+                  {renderTotalCell('PLY_CHAFER', 'usage', 'ply_usage')}
                   {days.map((d) => {
                     const summary = getSummaryForDate(d);
                     return renderCell(d, 'PLY_CHAFER', summary ? (summary.plyUsage ?? 0) : null, 'ply_usage');
@@ -664,10 +781,12 @@ export function MainReport() {
                 </TableRow>
                 <TableRow>
                   <RowHeader title="PLY & Chafer scrap weight (kg)" subtitle="簾紗及防擦布報廢公斤數(kg)" rowId="ply_scrap" />
+                  {renderTotalCell('PLY_CHAFER', 'scrap', 'ply_scrap')}
                   {days.map((d) => renderCell(d, 'PLY_CHAFER', getCustomScrapForDate(d, 'PLY_CHAFER'), 'ply_scrap'))}
                 </TableRow>
                 <TableRow className="bg-[#fce4d6]">
                   <RowHeader title="PLY & Chafer scrap rate (%)" subtitle="簾紗及防擦布報廢率(%)" rowId="ply_rate" />
+                  {renderTotalCell('PLY_CHAFER', 'rate', 'ply_rate')}
                   {days.map((d) => {
                     const summary = getSummaryForDate(d);
                     return renderCell(d, 'PLY_CHAFER', calculateRate(getCustomScrapForDate(d, 'PLY_CHAFER'), summary ? (summary.plyUsage ?? 0) : null), 'ply_rate');
@@ -677,6 +796,7 @@ export function MainReport() {
                 {/* Rubber (Mixing) */}
                 <TableRow>
                   <RowHeader title="Rubber usage weight (Mixing) (kg)" subtitle="膠料使用重量(kg)" rowId="rubber_usage" />
+                  {renderTotalCell('RUBBER_MIXING', 'usage', 'rubber_usage')}
                   {days.map((d) => {
                     const summary = getSummaryForDate(d);
                     return renderCell(d, 'RUBBER_MIXING', summary ? (summary.mixingRubberUsage ?? summary.rubberUsage ?? 0) : null, 'rubber_usage');
@@ -684,10 +804,12 @@ export function MainReport() {
                 </TableRow>
                 <TableRow>
                   <RowHeader title="Rubber scrap weight (Mixing) (kg)" subtitle="膠料報廢公斤數(kg)" rowId="rubber_scrap" />
+                  {renderTotalCell('RUBBER_MIXING', 'scrap', 'rubber_scrap')}
                   {days.map((d) => renderCell(d, 'RUBBER_MIXING', getCustomScrapForDate(d, 'RUBBER_MIXING'), 'rubber_scrap'))}
                 </TableRow>
                 <TableRow className="bg-[#ddebf7]">
                   <RowHeader title="Rubber scrap rate (Mixing) (%)" subtitle="膠料報廢率(%)" rowId="rubber_rate" />
+                  {renderTotalCell('RUBBER_MIXING', 'rate', 'rubber_rate')}
                   {days.map((d) => {
                     const summary = getSummaryForDate(d);
                     return renderCell(d, 'RUBBER_MIXING', calculateRate(getCustomScrapForDate(d, 'RUBBER_MIXING'), summary ? (summary.mixingRubberUsage ?? summary.rubberUsage ?? 0) : null), 'rubber_rate');
@@ -697,6 +819,7 @@ export function MainReport() {
                 {/* RN (Rubber Recycling) */}
                 <TableRow>
                   <RowHeader title="Extrusion rubber usage (kg)" subtitle="擠出膠料使用重量(kg)" rowId="rn_usage" />
+                  {renderTotalCell('RN', 'usage', 'rn_usage')}
                   {days.map((d) => {
                     const summary = getSummaryForDate(d);
                     return renderCell(d, 'RN', summary ? (summary.extrusionRubberUsage ?? 0) : null, 'rn_usage');
@@ -704,10 +827,12 @@ export function MainReport() {
                 </TableRow>
                 <TableRow>
                   <RowHeader title="RN generation weight (kg)" subtitle="RN產生重量(kg)" rowId="rn_scrap" />
+                  {renderTotalCell('RN', 'scrap', 'rn_scrap')}
                   {days.map((d) => renderCell(d, 'RN', getCustomScrapForDate(d, 'RN'), 'rn_scrap'))}
                 </TableRow>
                 <TableRow className="bg-[#ddebf7]">
                   <RowHeader title="Rubber recovery rate (%)" subtitle="膠料回收率(%)" rowId="rn_rate" />
+                  {renderTotalCell('RN', 'rate', 'rn_rate')}
                   {days.map((d) => {
                     const summary = getSummaryForDate(d);
                     const usageTotal = summary ? (summary.extrusionRubberUsage ?? 0) : 0;

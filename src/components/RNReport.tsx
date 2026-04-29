@@ -751,13 +751,6 @@ export function RNReport() {
                   </Bar>
                   <Bar dataKey="rn" name="RN (kg)" fill="#dc2626" radius={[4, 4, 0, 0]}>
                     <LabelList dataKey="rn" position="top" formatter={(v: number) => v.toFixed(0)} style={{ fontSize: '14px', fill: '#dc2626', fontWeight: 'bold' }} />
-                    <LabelList 
-                      dataKey="rate" 
-                      position="top" 
-                      offset={25} 
-                      formatter={(v: number) => v > 0 ? `${v.toFixed(1)}%` : ''} 
-                      style={{ fontSize: '14px', fill: '#16a34a', fontWeight: 'bold' }} 
-                    />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
