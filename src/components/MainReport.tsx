@@ -1036,9 +1036,18 @@ export function MainReport() {
                     let tireBuildingScrap = 0;
                     let filteredScraps = [];
 
-                    if (usageDetailModal.type === 'BIC') filteredScraps = dayScraps.filter((s: any) => s.material === 'BIC');
-                    else if (usageDetailModal.type === 'PLY_CHAFER') filteredScraps = dayScraps.filter((s: any) => (s.material === 'PLY' || s.material === 'Chafer') && (s.section === 'Calendering' || s.section === 'Cutting'));
-                    else if (usageDetailModal.type === 'RUBBER_MIXING') filteredScraps = dayScraps.filter((s: any) => s.material === 'Rubber' && s.section === 'Mixing');
+                    if (usageDetailModal.type === 'BIC') {
+                      filteredScraps = dayScraps.filter((s: any) => s.material === 'BIC');
+                      scrap = filteredScraps.reduce((sum: number, s: any) => sum + Number(s.weight || 0), 0);
+                    }
+                    else if (usageDetailModal.type === 'PLY_CHAFER') {
+                      filteredScraps = dayScraps.filter((s: any) => (s.material === 'PLY' || s.material === 'Chafer') && (s.section === 'Calendering' || s.section === 'Cutting'));
+                      scrap = filteredScraps.reduce((sum: number, s: any) => sum + Number(s.weight || 0), 0);
+                    }
+                    else if (usageDetailModal.type === 'RUBBER_MIXING') {
+                      filteredScraps = dayScraps.filter((s: any) => s.material === 'Rubber' && s.section === 'Mixing');
+                      scrap = filteredScraps.reduce((sum: number, s: any) => sum + Number(s.weight || 0), 0);
+                    }
                     else if (usageDetailModal.type === 'RN') {
                       extrusionScrap = dayScraps.filter((s: any) => 
                         (s.material === 'Extrusion Rubber' || s.material === 'RN') && 
@@ -1048,9 +1057,11 @@ export function MainReport() {
                         (s.material === 'Rubber' || s.material === 'RN') && 
                         s.section === 'Tire building'
                       ).reduce((sum: number, s: any) => sum + Number(s.weight || 0), 0);
-                      scrap = extrusionScrap + tireBuildingScrap;
-                    } else {
-                      scrap = filteredScraps.reduce((sum: number, s: any) => sum + Number(s.weight || 0), 0);
+                      scrap = dayScraps.filter((s: any) => 
+                        s.material === 'Extrusion Rubber' || 
+                        s.material === 'RN' || 
+                        (s.material === 'Rubber' && (s.section === 'Tire building' || s.section === 'Calendering' || s.section === 'Cutting'))
+                      ).reduce((sum: number, s: any) => sum + Number(s.weight || 0), 0);
                     }
                     
                     // Point 2: RN ratio = (Total RN) / Extrusion usage
@@ -1115,7 +1126,11 @@ export function MainReport() {
                           s.section === 'Tire building'
                         ).reduce((sum: number, s: any) => sum + Number(s.weight || 0), 0);
                         
-                        totalScrap = totalExtrusionScrap + totalTireBuildingScrap;
+                        totalScrap = dayScraps.filter((s: any) => 
+                          s.material === 'Extrusion Rubber' || 
+                          s.material === 'RN' || 
+                          (s.material === 'Rubber' && (s.section === 'Tire building' || s.section === 'Calendering' || s.section === 'Cutting'))
+                        ).reduce((sum: number, s: any) => sum + Number(s.weight || 0), 0);
                       }
                       
                       const totalRate = usageDetailModal.type === 'RN'
