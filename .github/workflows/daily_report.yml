@@ -1,0 +1,58 @@
+# Setup Guide: Automated LINE Reports via GitHub Actions
+
+To implement the daily screenshot bot to your LINE group, I've created two files in your repository:
+1. `scripts/report.js` (The Puppeteer script)
+2. `.github/workflows/daily_report.yml` (The GitHub Action)
+
+## Context: Why an Image Hosting API is Needed
+The LINE Messaging API requires images to be provided as a public HTTPS URL (using `originalContentUrl` and `previewImageUrl`). It does not allow uploading local image files directly in the API payload.
+
+Because GitHub Actions runs on a temporary server, the screenshot taken is local to the runner. To bypass this restriction, the `report.js` script automatically uploads the screenshot to a free image hosting API (**ImgBB**) to get a public URL, and then forwards that URL to your LINE Group.
+
+---
+
+## Step 1: Update the Target URL
+Modify `.github/workflows/daily_report.yml` and `scripts/report.js` to replace `https://YOUR_GITHUB_USERNAME.github.io/YOUR_REPO_NAME/` with your actual live GitHub Pages URL.
+
+---
+
+## Step 2: Get Free ImgBB API Key
+1. Go to [ImgBB API](https://api.imgbb.com/).
+2. Create an account and click **Create App** or **Get API Key**.
+3. Copy your API Key.
+
+---
+
+## Step 3: Configure GitHub Secrets
+
+You need to securely store your API keys as Secrets in your GitHub repository so the Workflow can use them without exposing them in the code.
+
+1. Go to your repository on GitHub.
+2. Click **Settings** (the gear icon on the top right).
+3. On the left sidebar, expand **Secrets and variables**, then click **Actions**.
+4. Click the green **New repository secret** button.
+5. Add the following three secrets (create them one by one):
+
+   ### 1. LINE_CHANNEL_ACCESS_TOKEN
+   - **Name:** `LINE_CHANNEL_ACCESS_TOKEN`
+   - **Secret:** *(Paste your long Channel Access Token from your LINE Developer Console -> Messaging API settings)*
+
+   ### 2. LINE_GROUP_ID
+   - **Name:** `LINE_GROUP_ID`
+   - **Secret:** *(Paste the Group ID of your LINE group here)*
+   *(Note: You can typically find the Group ID by having your bot print incoming Webhook events to your console when someone sends a message in the group, or by using a user-ID finder bot).*
+
+   ### 3. IMGBB_API_KEY
+   - **Name:** `IMGBB_API_KEY`
+   - **Secret:** *(Paste the API key you got from ImgBB)*
+
+---
+
+## Step 4: Test the Action Manually
+
+Since we added `workflow_dispatch:` to the YAML, you can test it right away without waiting for 9:30 AM:
+1. Go to the **Actions** tab in your GitHub repo.
+2. Under "All workflows" on the left, click **Daily Report Screenshot & LINE Push**.
+3. Click the **Run workflow** dropdown on the right and hit **Run workflow**.
+
+Wait a minute or two, and your LINE Group should receive the screenshot of your Main Report!
