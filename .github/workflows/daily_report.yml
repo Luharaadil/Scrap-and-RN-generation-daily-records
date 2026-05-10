@@ -16,9 +16,10 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24' # Updated to Node 24 to fix deprecation warning
 
-      - name: Install Dependencies
+      - name: Install Bot Dependencies
+        # We install these here instead of package.json to keep the website build clean
         run: npm install puppeteer axios form-data
 
       - name: Run Screenshot Script
