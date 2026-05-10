@@ -660,7 +660,7 @@ export function MainReport() {
       )}
 
       <Card className="overflow-hidden">
-        <div ref={tableRef} className="bg-white">
+        <div id="mri-report-table" ref={tableRef} className="bg-white">
           <CardHeader className="flex flex-row items-center justify-between pb-2 relative">
             <div className="flex-1" />
             <CardTitle className="text-2xl text-center flex-1 whitespace-nowrap">2026 MRI Production Weekly Report</CardTitle>

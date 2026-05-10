@@ -58,6 +58,17 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   // Update date range when week or numWeeks changes
   useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const isBot = urlParams.get('bot') === 'true';
+
+    if (isBot) {
+      setGlobalDateRange({
+        from: startOfMonth(new Date()),
+        to: new Date()
+      });
+      return;
+    }
+
     const year = getYear(new Date());
     const lastDayOfWeek = endOfISOWeek(setISOWeek(new Date(year, 0, 4), selectedWeek));
     const firstDayOfWeek = startOfISOWeek(addWeeks(lastDayOfWeek, -(numWeeks - 1)));

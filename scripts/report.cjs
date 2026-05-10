@@ -21,15 +21,33 @@ async function runReport() {
     const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 800 });
 
-    console.log(`Navigating to ${SITE_URL}...`);
-    await page.goto(SITE_URL, { waitUntil: 'networkidle2', timeout: 60000 });
+    const targetUrl = SITE_URL.includes('?') ? `${SITE_URL}&bot=true` : `${SITE_URL}?bot=true`;
+    console.log(`Navigating to ${targetUrl}...`);
+    await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 60000 });
     
     console.log('Waiting 15 seconds for charts and data to render completely...');
     await delay(15000); 
 
     const screenshotPath = 'main-report.png';
-    await page.screenshot({ path: screenshotPath, fullPage: true });
-    console.log('Screenshot taken!');
+    const element = await page.$('#mri-report-table');
+    if (element) {
+      await page.evaluate(() => {
+        const table = document.getElementById('mri-report-table');
+        if (table) {
+          table.style.width = 'max-content';
+          table.style.height = 'auto';
+          table.style.overflow = 'visible';
+          if (table.parentElement) {
+            table.parentElement.style.overflow = 'visible';
+          }
+        }
+      });
+      await element.screenshot({ path: screenshotPath });
+      console.log('Screenshot of #mri-report-table taken!');
+    } else {
+      console.log('Table not found, taking full page screenshot.');
+      await page.screenshot({ path: screenshotPath, fullPage: true });
+    }
 
     await uploadToImgBBAndSendToLine(screenshotPath);
   } catch (error) {
