@@ -2,7 +2,7 @@ name: Daily Report Screenshot & LINE Push
 
 on:
   schedule:
-    - cron: '0 4 * * *'
+    - cron: '30 5 * * *'
   workflow_dispatch:
 
 jobs:
