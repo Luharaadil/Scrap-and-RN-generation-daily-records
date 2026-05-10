@@ -13,8 +13,8 @@ const delay = (time) => new Promise(resolve => setTimeout(resolve, time));
 async function runReport() {
   console.log('Starting puppeteer...');
   const browser = await puppeteer.launch({
-    headless: 'new',
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--single-process']
   });
   
   try {
@@ -35,6 +35,7 @@ async function runReport() {
     await uploadToImgBBAndSendToLine(screenshotPath);
   } catch (error) {
     console.error('Bot Error:', error.message);
+    process.exitCode = 1;
   } finally {
     await browser.close();
   }
@@ -64,6 +65,7 @@ async function uploadToImgBBAndSendToLine(imagePath) {
     console.log('Sent to LINE!');
   } catch (error) {
     console.error('Upload/LINE Error:', error.response ? error.response.data : error.message);
+    throw error;
   }
 }
 

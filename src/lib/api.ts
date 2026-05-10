@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 const WEB_APP_URL = import.meta.env.VITE_WEB_APP_URL || 'https://script.google.com/macros/s/AKfycbwgP4jhdt0rom8RB3r3yvc42Xg-kgB4FgJ2DQTVOFHTir1g6mVFjCAMW5BB0dpbFbSARg/exec';
 
 export const getWebAppUrl = () => WEB_APP_URL;
