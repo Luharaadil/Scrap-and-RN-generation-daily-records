@@ -12,7 +12,7 @@ Because GitHub Actions runs on a temporary server, the screenshot taken is local
 ---
 
 ## Step 1: Update the Target URL
-Modify `.github/workflows/daily_report.yml` and `scripts/report.js` to replace `https://YOUR_GITHUB_USERNAME.github.io/YOUR_REPO_NAME/` with your actual live GitHub Pages URL.
+Modify `.github/workflows/daily_report.yml` and `scripts/report.js` to replace `https://luharaadil.github.io/Scrap-and-RN-generation-daily-records/` with your actual live GitHub Pages URL.
 
 ---
 
