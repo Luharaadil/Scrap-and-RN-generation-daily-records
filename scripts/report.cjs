@@ -22,11 +22,10 @@ async function runReport() {
     await page.setViewport({ width: 1280, height: 800 });
 
     console.log(`Navigating to ${SITE_URL}...`);
-    // Changed to 'domcontentloaded' to be faster and avoid timeouts
-    await page.goto(SITE_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.goto(SITE_URL, { waitUntil: 'networkidle2', timeout: 60000 });
     
-    console.log('Waiting 10 seconds for charts to render...');
-    await delay(10000); 
+    console.log('Waiting 15 seconds for charts and data to render completely...');
+    await delay(15000); 
 
     const screenshotPath = 'main-report.png';
     await page.screenshot({ path: screenshotPath, fullPage: true });
