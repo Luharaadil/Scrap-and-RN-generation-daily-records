@@ -19,8 +19,9 @@ function AppContent() {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <Tabs defaultValue="main" className="flex-1 flex flex-col">
         {/* Top Header */}
-        <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
-          <div className="max-w-[1600px] mx-auto px-4 h-20 flex items-center justify-between gap-4">
+        {!new URLSearchParams(window.location.search).get('bot') && (
+          <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
+            <div className="max-w-[1600px] mx-auto px-4 h-20 flex items-center justify-between gap-4">
             <div className="flex items-center gap-6">
               <h1 className="font-bold tracking-tight text-gray-900 text-xl whitespace-nowrap">
                 MRI Tracker
@@ -108,6 +109,7 @@ function AppContent() {
             </div>
           </div>
         </header>
+        )}
 
         {/* Main Content */}
         <main className="flex-1 overflow-y-auto p-4 md:p-8">

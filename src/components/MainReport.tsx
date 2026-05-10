@@ -664,8 +664,9 @@ export function MainReport() {
           <CardHeader className="flex flex-row items-center justify-between pb-2 relative">
             <div className="flex-1" />
             <CardTitle className="text-2xl text-center flex-1 whitespace-nowrap">2026 MRI Production Weekly Report</CardTitle>
-            <div className="flex items-center gap-2 flex-1 justify-end flex-wrap">
-              <div className="flex items-center gap-2">
+            {!new URLSearchParams(window.location.search).get('bot') && (
+              <div className="flex items-center gap-2 flex-1 justify-end flex-wrap">
+                <div className="flex items-center gap-2">
                 <Select value={selectedWeek.toString()} onValueChange={(v) => setSelectedWeek(parseInt(v))}>
                   <SelectTrigger className="w-[120px] h-10 font-bold">
                     <SelectValue placeholder="Select Week" />
@@ -731,6 +732,7 @@ export function MainReport() {
                 <Plus className="h-4 w-4" />
               </Button>
             </div>
+            )}
           </CardHeader>
           <CardContent className="p-0 overflow-x-auto">
             <div className="p-4">
