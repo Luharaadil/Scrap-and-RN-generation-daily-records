@@ -1,13 +1,13 @@
 name: Daily Report Screenshot & LINE Push
 
 on:
-  schedule:
-    - cron: '30 2 * * *'
   workflow_dispatch:
 
 jobs:
   screenshot_and_send:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout Repository
@@ -21,6 +21,11 @@ jobs:
       - name: Install Bot Dependencies
         # We install these here instead of package.json to keep the website build clean
         run: npm install puppeteer axios form-data
+
+      - name: Install additional OS dependencies and Chinese fonts for Puppeteer
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-xcb1 libxcomposite1 libxcursor1 libxdamage1 libxi6 libxtst6 libnss3 libcups2 libxss1 libxrandr2 libasound2 libpangocairo-1.0-0 libatk1.0-0 libatk-bridge2.0-0 libgtk-3-0 fonts-noto-cjk fonts-wqy-zenhei
 
       - name: Run Screenshot Script
         env:
