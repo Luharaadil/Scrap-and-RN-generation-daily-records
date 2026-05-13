@@ -40,6 +40,11 @@ async function runReport() {
           if (table.parentElement) {
             table.parentElement.style.overflow = 'visible';
           }
+          const cardContent = table.querySelector('.overflow-x-auto');
+          if (cardContent) {
+            cardContent.classList.remove('overflow-x-auto');
+            cardContent.style.overflow = 'visible';
+          }
         }
       });
       await element.screenshot({ path: screenshotPath });

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Loader2, Upload, X, Save, Package, Tag, Clock, Factory, Scale, AlertCircle, FileText, Camera } from 'lucide-react';
+import { Calendar as CalendarIcon, Loader2, Upload, X, Save, Package, Tag, Clock, Factory, Scale, AlertCircle, FileText, Camera, Settings, Users } from 'lucide-react';
 import { Calendar } from '@/src/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/src/components/ui/popover';
 import { Button } from '@/src/components/ui/button';
@@ -28,7 +28,9 @@ export function ScrapEntry() {
     mainReason: '',
     shift: '',
     section: '',
-    customSection: ''
+    customSection: '',
+    machineNo: '',
+    operatorId: ''
   });
   
   const [image, setImage] = useState<{ base64: string, mimeType: string } | null>(null);
@@ -114,6 +116,8 @@ export function ScrapEntry() {
           mainReason: formData.mainReason,
           shift: formData.shift,
           section: formData.section === 'Manual' ? formData.customSection : formData.section,
+          machineNo: formData.machineNo,
+          operatorId: formData.operatorId,
           imageBase64: image?.base64,
           imageMimeType: image?.mimeType
         });
@@ -129,6 +133,8 @@ export function ScrapEntry() {
           mainReason: formData.mainReason,
           shift: formData.shift,
           section: formData.section === 'Manual' ? formData.customSection : formData.section,
+          machineNo: formData.machineNo,
+          operatorId: formData.operatorId,
           imageBase64: image?.base64,
           imageMimeType: image?.mimeType
         });
@@ -143,6 +149,8 @@ export function ScrapEntry() {
           mainReason: formData.mainReason,
           shift: formData.shift,
           section: formData.section === 'Manual' ? formData.customSection : formData.section,
+          machineNo: formData.machineNo,
+          operatorId: formData.operatorId,
           imageBase64: image?.base64,
           imageMimeType: image?.mimeType
         });
@@ -150,7 +158,7 @@ export function ScrapEntry() {
       
       setMessage('Scrap data saved successfully!');
       loadData(true);
-      setFormData({ material: '', materialName: '', weight: '', reason: '', mainReason: '', shift: '', section: '', customSection: '' });
+      setFormData({ material: '', materialName: '', weight: '', reason: '', mainReason: '', shift: '', section: '', customSection: '', machineNo: '', operatorId: '' });
       clearImage();
     } catch (err: any) {
       setMessage(`Error: ${err.message}`);
@@ -322,6 +330,36 @@ export function ScrapEntry() {
                   <SelectItem value="Other">Other</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-sm font-semibold" htmlFor="machineNo">
+                <Settings className="h-4 w-4 text-primary" />
+                Machine No
+              </Label>
+              <Input 
+                id="machineNo" 
+                name="machineNo" 
+                value={formData.machineNo} 
+                onChange={handleChange} 
+                placeholder="e.g. M-01"
+                className="h-11"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-sm font-semibold" htmlFor="operatorId">
+                <Users className="h-4 w-4 text-primary" />
+                Operator ID
+              </Label>
+              <Input 
+                id="operatorId" 
+                name="operatorId" 
+                value={formData.operatorId} 
+                onChange={handleChange} 
+                placeholder="e.g. OP-123"
+                className="h-11"
+              />
             </div>
 
             <div className="space-y-2 md:col-span-2">

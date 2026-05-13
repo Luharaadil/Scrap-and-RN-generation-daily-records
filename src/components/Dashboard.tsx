@@ -9,6 +9,7 @@ import { Button } from '@/src/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/components/ui/select';
+import { Input } from '@/src/components/ui/input';
 import { getWebAppUrl } from '@/src/lib/api';
 import { cn } from '@/src/lib/utils';
 import { useData } from '@/src/lib/DataContext';
@@ -26,6 +27,17 @@ export function Dashboard() {
   });
 
   const [materialFilter, setMaterialFilter] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [colFilters, setColFilters] = useState<Record<string, string>>({
+    shift: '',
+    section: '',
+    material: '',
+    materialName: '',
+    machineNo: '',
+    operatorId: '',
+    mainReason: '',
+    reason: ''
+  });
   const [copiedSummary, setCopiedSummary] = useState(false);
   const [copiedScrap, setCopiedScrap] = useState(false);
   
@@ -120,6 +132,29 @@ export function Dashboard() {
   const filteredScraps = scraps.filter((scrap: any) => {
     if (sectionFilter !== 'All' && scrap.section !== sectionFilter) return false;
     if (materialFilter !== 'All' && scrap.material !== materialFilter) return false;
+    
+    if (colFilters.shift && !scrap.shift?.toLowerCase().includes(colFilters.shift.toLowerCase())) return false;
+    if (colFilters.section && !scrap.section?.toLowerCase().includes(colFilters.section.toLowerCase())) return false;
+    if (colFilters.material && !scrap.material?.toLowerCase().includes(colFilters.material.toLowerCase())) return false;
+    if (colFilters.materialName && !scrap.materialName?.toLowerCase().includes(colFilters.materialName.toLowerCase())) return false;
+    if (colFilters.machineNo && !scrap.machineNo?.toLowerCase().includes(colFilters.machineNo.toLowerCase())) return false;
+    if (colFilters.operatorId && !scrap.operatorId?.toLowerCase().includes(colFilters.operatorId.toLowerCase())) return false;
+    if (colFilters.mainReason && !scrap.mainReason?.toLowerCase().includes(colFilters.mainReason.toLowerCase())) return false;
+    if (colFilters.reason && !scrap.reason?.toLowerCase().includes(colFilters.reason.toLowerCase())) return false;
+
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const matches = 
+        scrap.shift?.toLowerCase().includes(q) ||
+        scrap.section?.toLowerCase().includes(q) ||
+        scrap.material?.toLowerCase().includes(q) ||
+        scrap.materialName?.toLowerCase().includes(q) ||
+        scrap.mainReason?.toLowerCase().includes(q) ||
+        scrap.reason?.toLowerCase().includes(q) ||
+        scrap.operatorId?.toLowerCase().includes(q) ||
+        scrap.machineNo?.toLowerCase().includes(q);
+      if (!matches) return false;
+    }
     return true;
   });
 
@@ -353,6 +388,14 @@ export function Dashboard() {
               <SelectItem value="Chemical" className="text-base">Chemical</SelectItem>
             </SelectContent>
           </Select>
+
+          <Input 
+            type="text" 
+            placeholder="Search (reason, machine...)" 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-[180px] h-10 text-sm"
+          />
         </div>
 
         <div className="flex items-center gap-2">
@@ -599,16 +642,98 @@ export function Dashboard() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Shift</TableHead>
-                    <TableHead>Section</TableHead>
-                    <TableHead>Material Type</TableHead>
-                    <TableHead>Material Name</TableHead>
-                    <TableHead>Weight (kg)</TableHead>
-                    <TableHead>Main Reason</TableHead>
-                    <TableHead>Reason</TableHead>
-                    <TableHead>Picture</TableHead>
-                    <TableHead>Recorded At</TableHead>
+                    <TableHead className="align-top pt-3">Date</TableHead>
+                    <TableHead className="align-top pt-3 min-w-[100px]">
+                      <div className="flex flex-col gap-1">
+                        <span>Shift</span>
+                        <Input 
+                          placeholder="Filter shift..." 
+                          value={colFilters.shift}
+                          onChange={(e) => setColFilters(f => ({...f, shift: e.target.value}))}
+                          className="h-7 text-xs bg-white font-normal px-2"
+                        />
+                      </div>
+                    </TableHead>
+                    <TableHead className="align-top pt-3 min-w-[120px]">
+                      <div className="flex flex-col gap-1">
+                        <span>Section</span>
+                        <Input 
+                          placeholder="Filter section..." 
+                          value={colFilters.section}
+                          onChange={(e) => setColFilters(f => ({...f, section: e.target.value}))}
+                          className="h-7 text-xs bg-white font-normal px-2"
+                        />
+                      </div>
+                    </TableHead>
+                    <TableHead className="align-top pt-3 min-w-[120px]">
+                      <div className="flex flex-col gap-1">
+                        <span>Material Type</span>
+                        <Input 
+                          placeholder="Filter type..." 
+                          value={colFilters.material}
+                          onChange={(e) => setColFilters(f => ({...f, material: e.target.value}))}
+                          className="h-7 text-xs bg-white font-normal px-2"
+                        />
+                      </div>
+                    </TableHead>
+                    <TableHead className="align-top pt-3 min-w-[120px]">
+                      <div className="flex flex-col gap-1">
+                        <span>Material Name</span>
+                        <Input 
+                          placeholder="Filter name..." 
+                          value={colFilters.materialName}
+                          onChange={(e) => setColFilters(f => ({...f, materialName: e.target.value}))}
+                          className="h-7 text-xs bg-white font-normal px-2"
+                        />
+                      </div>
+                    </TableHead>
+                    <TableHead className="align-top pt-3 min-w-[100px]">
+                      <div className="flex flex-col gap-1">
+                        <span>Machine No</span>
+                        <Input 
+                          placeholder="Filter machine..." 
+                          value={colFilters.machineNo}
+                          onChange={(e) => setColFilters(f => ({...f, machineNo: e.target.value}))}
+                          className="h-7 text-xs bg-white font-normal px-2"
+                        />
+                      </div>
+                    </TableHead>
+                    <TableHead className="align-top pt-3 min-w-[100px]">
+                      <div className="flex flex-col gap-1">
+                        <span>Op. ID</span>
+                        <Input 
+                          placeholder="Filter operator..." 
+                          value={colFilters.operatorId}
+                          onChange={(e) => setColFilters(f => ({...f, operatorId: e.target.value}))}
+                          className="h-7 text-xs bg-white font-normal px-2"
+                        />
+                      </div>
+                    </TableHead>
+                    <TableHead className="align-top pt-3">Weight (kg)</TableHead>
+                    <TableHead className="align-top pt-3 min-w-[120px]">
+                      <div className="flex flex-col gap-1">
+                        <span>Main Reason</span>
+                        <Input 
+                          placeholder="Filter main reason..." 
+                          value={colFilters.mainReason}
+                          onChange={(e) => setColFilters(f => ({...f, mainReason: e.target.value}))}
+                          className="h-7 text-xs bg-white font-normal px-2"
+                        />
+                      </div>
+                    </TableHead>
+                    <TableHead className="align-top pt-3 min-w-[150px]">
+                      <div className="flex flex-col gap-1">
+                        <span>Reason</span>
+                        <Input 
+                          placeholder="Filter reason..." 
+                          value={colFilters.reason}
+                          onChange={(e) => setColFilters(f => ({...f, reason: e.target.value}))}
+                          className="h-7 text-xs bg-white font-normal px-2"
+                        />
+                      </div>
+                    </TableHead>
+                    <TableHead className="align-top pt-3">Picture</TableHead>
+                    <TableHead className="align-top pt-3">Recorded At</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -619,6 +744,8 @@ export function Dashboard() {
                       <TableCell>{scrap.section}</TableCell>
                       <TableCell className="font-medium">{scrap.material}</TableCell>
                       <TableCell>{scrap.materialName || '-'}</TableCell>
+                      <TableCell>{scrap.machineNo || '-'}</TableCell>
+                      <TableCell>{scrap.operatorId || '-'}</TableCell>
                       <TableCell>{typeof scrap.weight === 'number' ? (scrap.weight === 0 ? '0' : scrap.weight.toFixed(1)) : (scrap.weight || '0')}</TableCell>
                       <TableCell>{scrap.mainReason || '-'}</TableCell>
                       <TableCell>

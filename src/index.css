@@ -126,5 +126,6 @@
     }
   html {
     @apply font-sans;
+    font-family: 'Geist Variable', 'Noto Sans CJK TC', 'WenQuanYi Zen Hei', sans-serif;
     }
 }

@@ -56,7 +56,9 @@ function doPost(e) {
         data.mainReason,   // G: Main Reason
         data.reason,       // H: Reason Detail
         imageUrl,          // I: Picture
-        data.timestamp     // J: Timestamp
+        data.timestamp,    // J: Timestamp
+        data.machineNo,    // K: Machine No
+        data.operatorId    // L: Operator Id
       ]);
       
       return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
@@ -145,7 +147,9 @@ function doGet(e) {
             mainReason: scData[i][6],
             reason: scData[i][7],
             imageUrl: scData[i][8],
-            timestamp: scData[i][9]
+            timestamp: scData[i][9],
+            machineNo: scData[i][10] || '',
+            operatorId: scData[i][11] || ''
           });
         }
       }
