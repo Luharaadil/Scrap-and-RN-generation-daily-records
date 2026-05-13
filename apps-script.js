@@ -91,6 +91,14 @@ function doPost(e) {
         sheet.appendRow([key, targets[key].value, targets[key].period]);
       }
       return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
+    } else if (action === 'saveUser') {
+      var sheet = ss.getSheetByName('Users');
+      if (!sheet) {
+        sheet = ss.insertSheet('Users');
+        sheet.appendRow(['ID', 'Password', 'Role']);
+      }
+      sheet.appendRow([data.userId, data.password, data.role || 'User']);
+      return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
     }
     
     return ContentService.createTextOutput(JSON.stringify({error: 'Unknown POST action'})).setMimeType(ContentService.MimeType.JSON);
@@ -174,6 +182,16 @@ function doGet(e) {
       }
     }
     return ContentService.createTextOutput(JSON.stringify({ targets: targets })).setMimeType(ContentService.MimeType.JSON);
+  } else if (action === 'getUsers') {
+    var users = [];
+    var sheet = ss.getSheetByName('Users');
+    if (sheet) {
+      var uData = sheet.getDataRange().getValues();
+      for (var j = 1; j < uData.length; j++) {
+        users.push({ id: String(uData[j][0]), password: String(uData[j][1]), role: String(uData[j][2]) });
+      }
+    }
+    return ContentService.createTextOutput(JSON.stringify({ users: users })).setMimeType(ContentService.MimeType.JSON);
   }
   
   return ContentService.createTextOutput(JSON.stringify({error: 'Unknown GET action: ' + action})).setMimeType(ContentService.MimeType.JSON);

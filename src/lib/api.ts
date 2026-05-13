@@ -154,3 +154,30 @@ export const updateScrapReason = async (timestamp: string, newReason: string) =>
     return handleErrorAsMock(err, 'updateScrapReason', { success: true });
   }
 };
+
+export const fetchUsers = async () => {
+  try {
+    const response = await fetch(`${WEB_APP_URL}?action=getUsers`);
+    if (!response.ok) throw new Error('Network response was not ok');
+    const data = await response.json();
+    return data;
+  } catch (err) {
+    return handleErrorAsMock(err, 'fetchUsers', { users: [] });
+  }
+};
+
+export const saveUser = async (user: any) => {
+  try {
+    const response = await fetch(WEB_APP_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8',
+      },
+      body: JSON.stringify({ action: 'saveUser', ...user }),
+    });
+    if (!response.ok) throw new Error('Network response was not ok');
+    return await response.json();
+  } catch (err) {
+    return handleErrorAsMock(err, 'saveUser', { success: true });
+  }
+};
