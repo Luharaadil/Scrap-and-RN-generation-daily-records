@@ -94,6 +94,26 @@ export function ScrapEntry() {
       setMessage('Error: Please enter the custom section name');
       return;
     }
+    if (!formData.machineNo) {
+      setMessage('Error: Please enter the Machine No');
+      return;
+    }
+    if (!formData.operatorId) {
+      setMessage('Error: Please enter the Operator ID');
+      return;
+    }
+    if (!formData.weight) {
+      setMessage('Error: Please enter the scrap weight');
+      return;
+    }
+    if (!formData.reason) {
+      setMessage('Error: Please enter the detailed reason');
+      return;
+    }
+    if (!image) {
+      setMessage('Error: Please upload a picture of the scrap');
+      return;
+    }
     
     setLoading(true);
     setMessage('');
