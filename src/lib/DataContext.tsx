@@ -14,6 +14,8 @@ interface DataContextType {
   updateTargets: (newTargets: any) => void;
   saveTargetsToSheet: (newTargets: any) => Promise<void>;
   updateScrapReasonInSheet: (timestamp: string, newReason: string) => Promise<void>;
+  updateScrapFullInSheet: (data: any) => Promise<void>;
+  deleteScrapFromSheet: (timestamp: string) => Promise<void>;
   isSyncingTargets: boolean;
   globalDateRange: DateRange | undefined;
   setGlobalDateRange: (range: DateRange | undefined) => void;
@@ -187,6 +189,36 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [loadData]);
 
+  const updateScrapFullInSheet = useCallback(async (data: any) => {
+    if (!getWebAppUrl()) return;
+    setLoading(true);
+    try {
+      const { updateScrapFull } = await import('./api');
+      await updateScrapFull(data);
+      await loadData(true);
+    } catch (err) {
+      console.error('Failed to update scrap full:', err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [loadData]);
+
+  const deleteScrapFromSheet = useCallback(async (timestamp: string) => {
+    if (!getWebAppUrl()) return;
+    setLoading(true);
+    try {
+      const { deleteScrap } = await import('./api');
+      await deleteScrap(timestamp);
+      await loadData(true);
+    } catch (err) {
+      console.error('Failed to delete scrap:', err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [loadData]);
+
   useEffect(() => {
     loadTargets();
   }, [loadTargets]);
@@ -198,7 +230,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   return (
     <DataContext.Provider value={{ 
       data, targets, configs, loading, error, loadData, loadTargets, updateTargets, 
-      saveTargetsToSheet, updateScrapReasonInSheet, isSyncingTargets,
+      saveTargetsToSheet, updateScrapReasonInSheet, updateScrapFullInSheet, deleteScrapFromSheet, isSyncingTargets,
       globalDateRange, setGlobalDateRange,
       globalShift, setGlobalShift,
       globalSection, setGlobalSection,

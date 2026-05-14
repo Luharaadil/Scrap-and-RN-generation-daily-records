@@ -19,6 +19,7 @@ export function ScrapEntry() {
   const [message, setMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { loadData } = useData();
+  const user = JSON.parse(localStorage.getItem('mri_auth_user') || 'null');
   
   const [formData, setFormData] = useState({
     material: '',
@@ -138,6 +139,7 @@ export function ScrapEntry() {
           section: formData.section === 'Manual' ? formData.customSection : formData.section,
           machineNo: formData.machineNo,
           operatorId: formData.operatorId,
+          addedBy: user?.id,
           imageBase64: image?.base64,
           imageMimeType: image?.mimeType
         });
@@ -155,6 +157,7 @@ export function ScrapEntry() {
           section: formData.section === 'Manual' ? formData.customSection : formData.section,
           machineNo: formData.machineNo,
           operatorId: formData.operatorId,
+          addedBy: user?.id,
           imageBase64: image?.base64,
           imageMimeType: image?.mimeType
         });
@@ -171,6 +174,7 @@ export function ScrapEntry() {
           section: formData.section === 'Manual' ? formData.customSection : formData.section,
           machineNo: formData.machineNo,
           operatorId: formData.operatorId,
+          addedBy: user?.id,
           imageBase64: image?.base64,
           imageMimeType: image?.mimeType
         });

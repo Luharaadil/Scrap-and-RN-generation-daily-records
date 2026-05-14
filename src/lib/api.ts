@@ -155,6 +155,51 @@ export const updateScrapReason = async (timestamp: string, newReason: string) =>
   }
 };
 
+export const updateScrapFull = async (data: any) => {
+  try {
+    const response = await fetch(WEB_APP_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8',
+      },
+      body: JSON.stringify({
+        action: 'updateScrapFull',
+        ...data
+      })
+    });
+    if (!response.ok) throw new Error('Failed to update scrap data.');
+    return await response.json();
+  } catch (err) {
+    const scraps = JSON.parse(localStorage.getItem(LS_SCRAPS) || '[]');
+    const updatedScraps = scraps.map((s: any) => 
+      s.timestamp === data.timestamp ? { ...s, ...data } : s
+    );
+    localStorage.setItem(LS_SCRAPS, JSON.stringify(updatedScraps));
+    return handleErrorAsMock(err, 'updateScrapFull', { success: true });
+  }
+};
+
+export const deleteScrap = async (timestamp: string) => {
+  try {
+    const response = await fetch(WEB_APP_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8',
+      },
+      body: JSON.stringify({
+        action: 'deleteScrap',
+        timestamp
+      })
+    });
+    if (!response.ok) throw new Error('Failed to delete scrap.');
+    return await response.json();
+  } catch (err) {
+    const scraps = JSON.parse(localStorage.getItem(LS_SCRAPS) || '[]').filter((s: any) => s.timestamp !== timestamp);
+    localStorage.setItem(LS_SCRAPS, JSON.stringify(scraps));
+    return handleErrorAsMock(err, 'deleteScrap', { success: true });
+  }
+};
+
 export const fetchUsers = async () => {
   try {
     const response = await fetch(`${WEB_APP_URL}?action=getUsers`);

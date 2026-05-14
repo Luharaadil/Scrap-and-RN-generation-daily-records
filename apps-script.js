@@ -58,9 +58,42 @@ function doPost(e) {
         imageUrl,          // I: Picture
         data.timestamp,    // J: Timestamp
         data.machineNo,    // K: Machine No
-        data.operatorId    // L: Operator Id
+        data.operatorId,   // L: Operator Id
+        data.addedBy       // M: Added By User ID
       ]);
       
+      return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
+
+    } else if (action === 'deleteScrap') {
+      var sheet = ss.getSheetByName('ScrapDetails');
+      if (!sheet) return ContentService.createTextOutput(JSON.stringify({error: 'ScrapDetails sheet not found'})).setMimeType(ContentService.MimeType.JSON);
+      
+      var dataRange = sheet.getDataRange();
+      var values = dataRange.getValues();
+      for (var i = 1; i < values.length; i++) {
+        if (values[i][9] == data.timestamp) { // Assuming timestamp is in column J (index 9)
+          sheet.deleteRow(i + 1);
+          break;
+        }
+      }
+      return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
+      
+    } else if (action === 'updateScrapFull') {
+      var sheet = ss.getSheetByName('ScrapDetails');
+      if (!sheet) return ContentService.createTextOutput(JSON.stringify({error: 'ScrapDetails sheet not found'})).setMimeType(ContentService.MimeType.JSON);
+      
+      var dataRange = sheet.getDataRange();
+      var values = dataRange.getValues();
+      for (var i = 1; i < values.length; i++) {
+        if (values[i][9] == data.timestamp) { 
+          if (data.weight !== undefined) sheet.getRange(i + 1, 6).setValue(data.weight);
+          if (data.mainReason !== undefined) sheet.getRange(i + 1, 7).setValue(data.mainReason);
+          if (data.reason !== undefined) sheet.getRange(i + 1, 8).setValue(data.reason);
+          if (data.machineNo !== undefined) sheet.getRange(i + 1, 11).setValue(data.machineNo);
+          if (data.operatorId !== undefined) sheet.getRange(i + 1, 12).setValue(data.operatorId);
+          break;
+        }
+      }
       return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
 
     } else if (action === 'updateScrapReason') {
@@ -157,7 +190,8 @@ function doGet(e) {
             imageUrl: scData[i][8],
             timestamp: scData[i][9],
             machineNo: scData[i][10] || '',
-            operatorId: scData[i][11] || ''
+            operatorId: scData[i][11] || '',
+            addedBy: scData[i][12] || ''
           });
         }
       }
