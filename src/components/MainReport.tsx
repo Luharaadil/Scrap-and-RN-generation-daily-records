@@ -141,9 +141,7 @@ export function MainReport() {
       );
     } else if (type === 'RN') {
       filtered = dayScraps.filter((s: any) => 
-        s.material === 'Extrusion Rubber' || 
-        s.material === 'RN' || 
-        (s.material === 'Rubber' && (s.section === 'Tire building' || s.section === 'Calendering' || s.section === 'Cutting'))
+        s.material === 'RN'
       );
     }
     
@@ -276,9 +274,7 @@ export function MainReport() {
       );
     } else if (detailModal.type === 'RN') {
       return dayScraps.filter((s: any) => 
-        s.material === 'Extrusion Rubber' || 
-        s.material === 'RN' || 
-        (s.material === 'Rubber' && (s.section === 'Tire building' || s.section === 'Calendering' || s.section === 'Cutting'))
+        s.material === 'RN'
       );
     }
     return [];
@@ -364,7 +360,7 @@ export function MainReport() {
             if (type === 'BIC') filtered = monthScraps.filter((s: any) => s.material === 'BIC');
             else if (type === 'PLY_CHAFER') filtered = monthScraps.filter((s: any) => (s.material === 'PLY' || s.material === 'Chafer') && (s.section === 'Calendering' || s.section === 'Cutting'));
             else if (type === 'RUBBER_MIXING') filtered = monthScraps.filter((s: any) => s.material === 'Rubber' && s.section === 'Mixing');
-            else if (type === 'RN') filtered = monthScraps.filter((s: any) => s.material === 'Extrusion Rubber' || s.material === 'RN');
+            else if (type === 'RN') filtered = monthScraps.filter((s: any) => s.material === 'RN');
             
             cumulativeScrap = filtered.reduce((sum: number, s: any) => sum + Number(s.weight || 0), 0);
           } else {
@@ -382,7 +378,7 @@ export function MainReport() {
             if (type === 'BIC') filtered = weekScraps.filter((s: any) => s.material === 'BIC');
             else if (type === 'PLY_CHAFER') filtered = weekScraps.filter((s: any) => (s.material === 'PLY' || s.material === 'Chafer') && (s.section === 'Calendering' || s.section === 'Cutting'));
             else if (type === 'RUBBER_MIXING') filtered = weekScraps.filter((s: any) => s.material === 'Rubber' && s.section === 'Mixing');
-            else if (type === 'RN') filtered = weekScraps.filter((s: any) => s.material === 'Extrusion Rubber' || s.material === 'RN');
+            else if (type === 'RN') filtered = weekScraps.filter((s: any) => s.material === 'RN');
             
             cumulativeScrap = filtered.reduce((sum: number, s: any) => sum + Number(s.weight || 0), 0);
           }
@@ -1053,17 +1049,15 @@ export function MainReport() {
                     }
                     else if (usageDetailModal.type === 'RN') {
                       extrusionScrap = dayScraps.filter((s: any) => 
-                        (s.material === 'Extrusion Rubber' || s.material === 'RN') && 
+                        s.material === 'RN' && 
                         (s.section === 'Extrusion' || !s.section || s.section === 'Mixing')
                       ).reduce((sum: number, s: any) => sum + Number(s.weight || 0), 0);
                       tireBuildingScrap = dayScraps.filter((s: any) => 
-                        (s.material === 'Rubber' || s.material === 'RN') && 
+                        s.material === 'RN' && 
                         s.section === 'Tire building'
                       ).reduce((sum: number, s: any) => sum + Number(s.weight || 0), 0);
                       scrap = dayScraps.filter((s: any) => 
-                        s.material === 'Extrusion Rubber' || 
-                        s.material === 'RN' || 
-                        (s.material === 'Rubber' && (s.section === 'Tire building' || s.section === 'Calendering' || s.section === 'Cutting'))
+                        s.material === 'RN'
                       ).reduce((sum: number, s: any) => sum + Number(s.weight || 0), 0);
                     }
                     
@@ -1120,19 +1114,17 @@ export function MainReport() {
                       else if (usageDetailModal.type === 'RUBBER_MIXING') totalScrap = dayScraps.filter((s: any) => s.material === 'Rubber' && s.section === 'Mixing').reduce((sum: number, s: any) => sum + Number(s.weight || 0), 0);
                       else if (usageDetailModal.type === 'RN') {
                         totalExtrusionScrap = dayScraps.filter((s: any) => 
-                          (s.material === 'Extrusion Rubber' || s.material === 'RN') && 
+                          s.material === 'RN' && 
                           (s.section === 'Extrusion' || !s.section || s.section === 'Mixing')
                         ).reduce((sum: number, s: any) => sum + Number(s.weight || 0), 0);
                         
                         totalTireBuildingScrap = dayScraps.filter((s: any) => 
-                          (s.material === 'Rubber' || s.material === 'RN') && 
+                          s.material === 'RN' && 
                           s.section === 'Tire building'
                         ).reduce((sum: number, s: any) => sum + Number(s.weight || 0), 0);
                         
                         totalScrap = dayScraps.filter((s: any) => 
-                          s.material === 'Extrusion Rubber' || 
-                          s.material === 'RN' || 
-                          (s.material === 'Rubber' && (s.section === 'Tire building' || s.section === 'Calendering' || s.section === 'Cutting'))
+                          s.material === 'RN'
                         ).reduce((sum: number, s: any) => sum + Number(s.weight || 0), 0);
                       }
                       

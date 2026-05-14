@@ -108,17 +108,17 @@ export function RNReport() {
     const usage = extrusionUsage;
 
     const extrusionScrap = scraps.filter((s: any) => 
-      (s.material === 'Extrusion Rubber' || s.material === 'RN') && 
+      s.material === 'RN' && 
       (s.section === 'Extrusion' || !s.section || s.section === 'Mixing')
     ).reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
 
     const calenderingScrap = scraps.filter((s: any) => 
-      (s.material === 'Extrusion Rubber' || s.material === 'RN') && 
+      s.material === 'RN' && 
       (s.section === 'Calendering' || s.section === 'Cutting')
     ).reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
 
     const tireBuildingScrap = scraps.filter((s: any) => 
-      (s.material === 'Rubber' || s.material === 'RN') && 
+      s.material === 'RN' && 
       s.section === 'Tire building'
     ).reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
 
@@ -146,17 +146,17 @@ export function RNReport() {
     const usage = extrusionUsage;
 
     const extrusionScrap = dayScraps.filter((s: any) => 
-      (s.material === 'Extrusion Rubber' || s.material === 'RN') && 
+      s.material === 'RN' && 
       (s.section === 'Extrusion' || !s.section || s.section === 'Mixing')
     ).reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
 
     const calenderingScrap = dayScraps.filter((s: any) => 
-      (s.material === 'Extrusion Rubber' || s.material === 'RN') && 
+      s.material === 'RN' && 
       (s.section === 'Calendering' || s.section === 'Cutting')
     ).reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
 
     const tireBuildingScrap = dayScraps.filter((s: any) => 
-      (s.material === 'Rubber' || s.material === 'RN') && 
+      s.material === 'RN' && 
       s.section === 'Tire building'
     ).reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
 
@@ -174,17 +174,17 @@ export function RNReport() {
     if (dayScraps.length === 0) return null;
 
     const extrusionScrap = dayScraps.filter((s: any) => 
-      (s.material === 'Extrusion Rubber' || s.material === 'RN') && 
+      s.material === 'RN' && 
       (s.section === 'Extrusion' || !s.section || s.section === 'Mixing')
     ).reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
 
     const calenderingScrap = dayScraps.filter((s: any) => 
-      (s.material === 'Extrusion Rubber' || s.material === 'RN') && 
+      s.material === 'RN' && 
       (s.section === 'Calendering' || s.section === 'Cutting')
     ).reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
 
     const tireBuildingScrap = dayScraps.filter((s: any) => 
-      (s.material === 'Rubber' || s.material === 'RN') && 
+      s.material === 'RN' && 
       s.section === 'Tire building'
     ).reduce((sum: number, s: any) => sum + (parseFloat(s.weight) || 0), 0);
 
@@ -195,7 +195,7 @@ export function RNReport() {
     if (!data?.scraps) return [];
     const materials = new Set<string>();
     data.scraps.forEach((s: any) => {
-      if (s.materialName && (s.material === 'Extrusion Rubber' || s.material === 'RN' || (s.material === 'Rubber' && (s.section === 'Tire building' || s.section === 'Calendering' || s.section === 'Cutting')))) {
+      if (s.materialName && s.material === 'RN') {
         materials.add(s.materialName);
       }
     });
@@ -395,9 +395,7 @@ export function RNReport() {
     }
 
     return dayScraps.filter((s: any) => 
-      s.material === 'Extrusion Rubber' || 
-      s.material === 'RN' || 
-      (s.material === 'Rubber' && s.section === 'Tire building')
+      s.material === 'RN'
     );
   };
 

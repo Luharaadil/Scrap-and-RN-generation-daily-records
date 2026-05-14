@@ -186,8 +186,7 @@ export function Dashboard() {
 
   const getRnScraps = () => {
     return filteredScraps.filter((s: any) => 
-      s.material === 'RN' || 
-      s.material === 'Extrusion Rubber'
+      s.material === 'RN'
     );
   };
 
@@ -267,7 +266,7 @@ export function Dashboard() {
       const isBic = s.material === 'BIC';
       const isPly = s.material === 'PLY' || s.material === 'Chafer';
       const isRubber = s.material === 'Rubber';
-      const isRn = s.material === 'RN' || s.material === 'Extrusion Rubber';
+      const isRn = s.material === 'RN';
       return !isBic && !isPly && !isRubber && !isRn;
     });
   };
