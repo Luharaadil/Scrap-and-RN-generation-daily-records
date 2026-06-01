@@ -18,7 +18,7 @@ export function ScrapEntry() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { loadData } = useData();
+  const { loadData, scrapPicRequirements, materialReasons } = useData();
   const user = JSON.parse(localStorage.getItem('mri_auth_user') || 'null');
   
   const [formData, setFormData] = useState({
@@ -42,7 +42,11 @@ export function ScrapEntry() {
   };
 
   const handleSelectChange = (name: string, value: string) => {
-    setFormData({ ...formData, [name]: value });
+    if (name === 'material') {
+      setFormData({ ...formData, material: value, mainReason: '' });
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -111,7 +115,8 @@ export function ScrapEntry() {
       setMessage('Error: Please enter the detailed reason');
       return;
     }
-    if (!image) {
+    const picReq = scrapPicRequirements[formData.material] || 'Mandatory';
+    if (picReq === 'Mandatory' && !image) {
       setMessage('Error: Please upload a picture of the scrap');
       return;
     }
@@ -346,12 +351,12 @@ export function ScrapEntry() {
                   <SelectValue placeholder="Select reason" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Die Rubber">Die Rubber</SelectItem>
-                  <SelectItem value="Machine NG">Machine NG</SelectItem>
-                  <SelectItem value="Human Error">Human Error</SelectItem>
-                  <SelectItem value="Process scrap">Process scrap</SelectItem>
-                  <SelectItem value="Spec finish">Spec finish</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
+                  {((formData.material && materialReasons[formData.material] && materialReasons[formData.material].length > 0) 
+                    ? materialReasons[formData.material] 
+                    : ["Die Rubber", "Machine NG", "Human Error", "Process scrap", "Spec finish", "Other"]
+                  ).map((reason) => (
+                    <SelectItem key={reason} value={reason}>{reason}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -404,7 +409,18 @@ export function ScrapEntry() {
           </div>
 
           <div className="space-y-2">
-            <Label>Scrap Picture Preview</Label>
+            <Label className="flex items-center gap-2">
+              <span>Scrap Picture Preview</span>
+              {formData.material && (
+                <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium", 
+                  (scrapPicRequirements[formData.material] || 'Mandatory') === 'Mandatory' 
+                    ? 'bg-red-100 text-red-800' 
+                    : 'bg-green-100 text-green-800'
+                )}>
+                  {(scrapPicRequirements[formData.material] || 'Mandatory') === 'Mandatory' ? 'Mandatory' : 'Optional'}
+                </span>
+              )}
+            </Label>
             <div className="flex items-center gap-4">
               <input 
                 type="file" 

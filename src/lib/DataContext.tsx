@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { format, startOfMonth, startOfWeek, endOfWeek, getISOWeek, setISOWeek, getYear, startOfISOWeek, endOfISOWeek, addWeeks } from 'date-fns';
-import { fetchRangeData, fetchTargets, getWebAppUrl, saveTargets } from './api';
+import { fetchRangeData, fetchTargets, getWebAppUrl, saveTargets, fetchScrapSettings, saveScrapSettings } from './api';
 import { DateRange } from 'react-day-picker';
 
 interface DataContextType {
@@ -27,6 +27,10 @@ interface DataContextType {
   setSelectedWeek: (week: number) => void;
   numWeeks: number;
   setNumWeeks: (num: number) => void;
+  scrapPicRequirements: Record<string, 'Mandatory' | 'Optional'>;
+  materialReasons: Record<string, string[]>;
+  loadScrapSettings: () => Promise<void>;
+  updateScrapSettingsInSheet: (picReqs: Record<string, 'Mandatory' | 'Optional'>, matReasons: Record<string, string[]>) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -57,6 +61,20 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [globalSection, setGlobalSection] = useState('All');
   const [selectedWeek, setSelectedWeek] = useState<number>(getISOWeek(new Date()));
   const [numWeeks, setNumWeeks] = useState<number>(1);
+  const [scrapPicRequirements, setScrapPicRequirements] = useState<Record<string, 'Mandatory' | 'Optional'>>({});
+  const [materialReasons, setMaterialReasons] = useState<Record<string, string[]>>({});
+
+  // Use refs to stabilize loadData and avoid infinite renders
+  const dataRef = React.useRef(data);
+  const lastFetchRangeRef = React.useRef(lastFetchRange);
+
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+
+  useEffect(() => {
+    lastFetchRangeRef.current = lastFetchRange;
+  }, [lastFetchRange]);
 
   // Update date range when week or numWeeks changes
   useEffect(() => {
@@ -99,35 +117,37 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         console.warn('No configs found in targetResult. Ensure Google Apps Script returns a "configs" array with id and password.');
       }
       if (targetResult && targetResult.targets) {
-        const newTargets: any = { ...targets };
-        targetResult.targets.forEach((t: any) => {
-          let rowId = '';
-          const cat = String(t.category || '').toLowerCase();
-          if (cat.includes('bic') && cat.includes('scrap')) rowId = 'bic_scrap';
-          else if (cat.includes('ply') && cat.includes('scrap')) rowId = 'ply_scrap';
-          else if (cat.includes('rubber') && cat.includes('scrap')) rowId = 'rubber_scrap';
-          else if (cat.includes('rn') && cat.includes('scrap')) rowId = 'rn_scrap';
-          else if (cat.includes('bic') && cat.includes('rate')) rowId = 'bic_rate';
-          else if (cat.includes('ply') && cat.includes('rate')) rowId = 'ply_rate';
-          else if (cat.includes('rubber') && cat.includes('rate')) rowId = 'rubber_rate';
-          else if (cat.includes('rn') && cat.includes('rate')) rowId = 'rn_rate';
-          
-          if (rowId) {
-            const period = String(t.period || '').toLowerCase();
-            newTargets[rowId] = {
-              value: Number(t.value || 0),
-              period: period === 'not use' ? 'not_use' : (['daily', 'weekly', 'monthly', 'not_use'].includes(period) ? period : 'daily')
-            };
-          }
+        setTargets((prevTargets: any) => {
+          const newTargets = { ...prevTargets };
+          targetResult.targets.forEach((t: any) => {
+            let rowId = '';
+            const cat = String(t.category || '').toLowerCase();
+            if (cat.includes('bic') && cat.includes('scrap')) rowId = 'bic_scrap';
+            else if (cat.includes('ply') && cat.includes('scrap')) rowId = 'ply_scrap';
+            else if (cat.includes('rubber') && cat.includes('scrap')) rowId = 'rubber_scrap';
+            else if (cat.includes('rn') && cat.includes('scrap')) rowId = 'rn_scrap';
+            else if (cat.includes('bic') && cat.includes('rate')) rowId = 'bic_rate';
+            else if (cat.includes('ply') && cat.includes('rate')) rowId = 'ply_rate';
+            else if (cat.includes('rubber') && cat.includes('rate')) rowId = 'rubber_rate';
+            else if (cat.includes('rn') && cat.includes('rate')) rowId = 'rn_rate';
+            
+            if (rowId) {
+              const period = String(t.period || '').toLowerCase();
+              newTargets[rowId] = {
+                value: Number(t.value || 0),
+                period: period === 'not use' ? 'not_use' : (['daily', 'weekly', 'monthly', 'not_use'].includes(period) ? period : 'daily')
+              };
+            }
+          });
+          return newTargets;
         });
-        setTargets(newTargets);
       }
     } catch (err) {
       console.error('Failed to load targets:', err);
     } finally {
       setIsSyncingTargets(false);
     }
-  }, [targets]);
+  }, []);
 
   const saveTargetsToSheet = useCallback(async (newTargets: any) => {
     if (!getWebAppUrl()) return;
@@ -154,7 +174,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     const start = customStart || (globalDateRange?.from ? format(startOfMonth(globalDateRange.from), 'yyyy-MM-dd') : format(prevMonth, 'yyyy-MM-dd'));
     const end = customEnd || (globalDateRange?.to ? format(new Date(globalDateRange.to.getTime() + 14 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd') : format(new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'));
 
-    if (!force && data && lastFetchRange?.start === start && lastFetchRange?.end === end) {
+    if (!force && dataRef.current && lastFetchRangeRef.current?.start === start && lastFetchRangeRef.current?.end === end) {
       return;
     }
 
@@ -172,7 +192,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [data, lastFetchRange, globalDateRange]);
+  }, [globalDateRange]);
 
   const updateScrapReasonInSheet = useCallback(async (timestamp: string, newReason: string) => {
     if (!getWebAppUrl()) return;
@@ -219,9 +239,48 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [loadData]);
 
+  const loadScrapSettings = useCallback(async () => {
+    if (!getWebAppUrl()) return;
+    try {
+      const res = await fetchScrapSettings();
+      if (res) {
+        if (res.scrapPicRequirements) {
+          setScrapPicRequirements(res.scrapPicRequirements);
+        }
+        if (res.materialReasons) {
+          setMaterialReasons(res.materialReasons);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load scrap settings:', err);
+    }
+  }, []);
+
+  const updateScrapSettingsInSheet = useCallback(async (picReqs: Record<string, 'Mandatory' | 'Optional'>, matReasons: Record<string, string[]>) => {
+    if (!getWebAppUrl()) return;
+    setLoading(true);
+    try {
+      await saveScrapSettings({
+        scrapPicRequirements: picReqs,
+        materialReasons: matReasons
+      });
+      setScrapPicRequirements(picReqs);
+      setMaterialReasons(matReasons);
+    } catch (err) {
+      console.error('Failed to save scrap settings:', err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadTargets();
   }, [loadTargets]);
+
+  useEffect(() => {
+    loadScrapSettings();
+  }, [loadScrapSettings]);
 
   useEffect(() => {
     loadData();
@@ -235,7 +294,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       globalShift, setGlobalShift,
       globalSection, setGlobalSection,
       selectedWeek, setSelectedWeek,
-      numWeeks, setNumWeeks
+      numWeeks, setNumWeeks,
+      scrapPicRequirements,
+      materialReasons,
+      loadScrapSettings,
+      updateScrapSettingsInSheet
     }}>
       {children}
     </DataContext.Provider>

@@ -226,3 +226,38 @@ export const saveUser = async (user: any) => {
     return handleErrorAsMock(err, 'saveUser', { success: true });
   }
 };
+
+export const fetchScrapSettings = async () => {
+  try {
+    const response = await fetch(`${WEB_APP_URL}?action=getScrapSettings`);
+    if (!response.ok) throw new Error('Network response was not ok');
+    return await response.json();
+  } catch (err) {
+    const scrapPicRequirements = JSON.parse(localStorage.getItem('mri_scrap_pic_requirements_fallback') || '{}');
+    const materialReasons = JSON.parse(localStorage.getItem('mri_material_reasons_fallback') || '{}');
+    return handleErrorAsMock(err, 'fetchScrapSettings', { scrapPicRequirements, materialReasons });
+  }
+};
+
+export const saveScrapSettings = async (settings: any) => {
+  try {
+    const response = await fetch(WEB_APP_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8',
+      },
+      body: JSON.stringify({ action: 'saveScrapSettings', settings }),
+    });
+    if (!response.ok) throw new Error('Network response was not ok');
+    return await response.json();
+  } catch (err) {
+    if (settings.scrapPicRequirements) {
+      localStorage.setItem('mri_scrap_pic_requirements_fallback', JSON.stringify(settings.scrapPicRequirements));
+    }
+    if (settings.materialReasons) {
+      localStorage.setItem('mri_material_reasons_fallback', JSON.stringify(settings.materialReasons));
+    }
+    return handleErrorAsMock(err, 'saveScrapSettings', { success: true });
+  }
+};
+

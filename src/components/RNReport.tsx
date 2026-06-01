@@ -312,6 +312,21 @@ export function RNReport() {
     }
   }, []);
 
+  // Synchronize callbacks in refs to prevent unnecessary re-running of setControls effect
+  const copyValuesOnlyRef = useRef(copyValuesOnly);
+  const copyAsPictureRef = useRef(copyAsPicture);
+  const loadDataRef = useRef(loadData);
+  const toggleRowVisibilityRef = useRef(toggleRowVisibility);
+  const showAllRowsRef = useRef(showAllRows);
+
+  useEffect(() => {
+    copyValuesOnlyRef.current = copyValuesOnly;
+    copyAsPictureRef.current = copyAsPicture;
+    loadDataRef.current = loadData;
+    toggleRowVisibilityRef.current = toggleRowVisibility;
+    showAllRowsRef.current = showAllRows;
+  });
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setControls(
@@ -333,7 +348,7 @@ export function RNReport() {
                         <input 
                           type="checkbox" 
                           checked={!hiddenRows.includes(row.id)} 
-                          onChange={() => toggleRowVisibility(row.id)}
+                          onChange={() => toggleRowVisibilityRef.current(row.id)}
                           className="rounded border-gray-300"
                         />
                         <span className="truncate">{row.title}</span>
@@ -342,7 +357,7 @@ export function RNReport() {
                   </div>
                   {hiddenRows.length > 0 && (
                     <div className="pt-2 border-t mt-2">
-                      <Button variant="ghost" size="sm" className="w-full text-xs" onClick={showAllRows}>
+                      <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => showAllRowsRef.current()}>
                         Show all rows
                       </Button>
                     </div>
@@ -350,15 +365,15 @@ export function RNReport() {
                 </div>
               </PopoverContent>
             </Popover>
-            <Button variant="outline" size="sm" onClick={copyValuesOnly} title="Copy values only" className="h-10 font-bold">
+            <Button variant="outline" size="sm" onClick={() => copyValuesOnlyRef.current()} title="Copy values only" className="h-10 font-bold">
               {copiedText ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <Copy className="h-4 w-4 mr-2" />}
               <span className="hidden sm:inline">Values</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={copyAsPicture} title="Copy table as picture" className="h-10 font-bold">
+            <Button variant="outline" size="sm" onClick={() => copyAsPictureRef.current()} title="Copy table as picture" className="h-10 font-bold">
               {copiedImage ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <ImageIcon className="h-4 w-4 mr-2" />}
               <span className="hidden sm:inline">Copy Table</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={() => loadData(true)} disabled={loading} className="h-10 font-bold">
+            <Button variant="outline" size="sm" onClick={() => loadDataRef.current(true)} disabled={loading} className="h-10 font-bold">
               <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
               <span className="hidden sm:inline">Reload</span>
             </Button>
@@ -379,7 +394,7 @@ export function RNReport() {
       clearTimeout(timer);
       setControls(null);
     };
-  }, [loading, copiedText, copiedImage, isEditingFont, hiddenRows, toggleRowVisibility, showAllRows, copyValuesOnly, copyAsPicture, loadData, setControls]);
+  }, [loading, copiedText, copiedImage, isEditingFont, hiddenRows, setControls]);
 
   const getFilteredScrapsForModal = () => {
     if (!detailModal) return [];
@@ -520,6 +535,32 @@ export function RNReport() {
   };
 
   const renderSummaryCells = (values: any[], rowId: string) => {
+    const isRate = rowId.includes('rate');
+
+    if (isRate) {
+      let totalScrap = 0;
+      let totalUsage = 0;
+      
+      if (rowId === 'rn_total_rate') {
+        totalScrap = days.reduce((sum, d) => sum + (getTotalData(d).rn || 0), 0);
+        totalUsage = days.reduce((sum, d) => sum + (getTotalData(d).usage || 0), 0);
+      } else {
+        const shift = rowId.split('_')[1];
+        totalScrap = days.reduce((sum, d) => sum + (getShiftData(d, shift).rn || 0), 0);
+        totalUsage = days.reduce((sum, d) => sum + (getShiftData(d, shift).usage || 0), 0);
+      }
+      
+      const overallRate = totalUsage > 0 ? (totalScrap / totalUsage) * 100 : 0;
+      const displayRate = totalUsage > 0 ? overallRate.toFixed(1) + '%' : '';
+      const isOverTarget = targets?.rn_rate?.value > 0 && overallRate > targets.rn_rate.value;
+
+      return (
+        <TableCell colSpan={2} className={cn("border border-gray-300 text-center font-bold bg-gray-50", isOverTarget && "text-red-600")} style={{ fontSize: `${rowFontSizes[rowId] || 17}px` }}>
+          {displayRate}
+        </TableCell>
+      );
+    }
+
     const numericValues = values
       .map(v => (typeof v === 'number' ? v : parseFloat(v)))
       .filter(v => v !== null && v !== undefined && !isNaN(v));
@@ -527,18 +568,8 @@ export function RNReport() {
     const sum = numericValues.reduce((acc, v) => acc + v, 0);
     const avg = numericValues.length > 0 ? sum / numericValues.length : 0;
 
-    const isRate = rowId.includes('rate');
     const displaySum = sum.toFixed(0);
-    const displayAvg = isRate ? avg.toFixed(1) + '%' : avg.toFixed(0);
-    const isOverTarget = isRate && targets?.rn_rate?.value > 0 && avg > targets.rn_rate.value;
-
-    if (isRate) {
-      return (
-        <TableCell colSpan={2} className={cn("border border-gray-300 text-center font-bold bg-gray-50", isOverTarget && "text-red-600")} style={{ fontSize: `${rowFontSizes[rowId] || 17}px` }}>
-          {displayAvg}
-        </TableCell>
-      );
-    }
+    const displayAvg = avg.toFixed(0);
 
     return (
       <>
