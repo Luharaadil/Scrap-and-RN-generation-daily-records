@@ -53,10 +53,29 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState('');
   const [lastFetchRange, setLastFetchRange] = useState<{ start: string, end: string } | null>(null);
 
-  const [globalDateRange, setGlobalDateRange] = useState<DateRange | undefined>({
-    from: startOfWeek(new Date(), { weekStartsOn: 1 }),
-    to: endOfWeek(new Date(), { weekStartsOn: 1 }),
-  });
+  const getInitialDateRange = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const isBot = urlParams.get('bot') === 'true';
+
+    if (isBot) {
+      return {
+        from: startOfMonth(new Date()),
+        to: new Date()
+      };
+    }
+
+    const initialWeek = getISOWeek(new Date());
+    const year = getYear(new Date());
+    const lastDayOfWeek = endOfISOWeek(setISOWeek(new Date(year, 0, 4), initialWeek));
+    const firstDayOfWeek = startOfISOWeek(addWeeks(lastDayOfWeek, 0)); // numWeeks = 1
+    
+    return {
+      from: firstDayOfWeek,
+      to: lastDayOfWeek
+    };
+  };
+
+  const [globalDateRange, setGlobalDateRange] = useState<DateRange | undefined>(getInitialDateRange);
   const [globalShift, setGlobalShift] = useState('All');
   const [globalSection, setGlobalSection] = useState('All');
   const [selectedWeek, setSelectedWeek] = useState<number>(getISOWeek(new Date()));
@@ -76,15 +95,19 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     lastFetchRangeRef.current = lastFetchRange;
   }, [lastFetchRange]);
 
-  // Update date range when week or numWeeks changes
+  // Update date range when week or numWeeks changes, preventing unnecessary state triggers
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const isBot = urlParams.get('bot') === 'true';
 
     if (isBot) {
-      setGlobalDateRange({
-        from: startOfMonth(new Date()),
-        to: new Date()
+      setGlobalDateRange(prev => {
+        const from = startOfMonth(new Date());
+        const to = new Date();
+        if (prev?.from?.getTime() === from.getTime() && prev?.to?.getTime() === to.getTime()) {
+          return prev;
+        }
+        return { from, to };
       });
       return;
     }
@@ -93,9 +116,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     const lastDayOfWeek = endOfISOWeek(setISOWeek(new Date(year, 0, 4), selectedWeek));
     const firstDayOfWeek = startOfISOWeek(addWeeks(lastDayOfWeek, -(numWeeks - 1)));
     
-    setGlobalDateRange({
-      from: firstDayOfWeek,
-      to: lastDayOfWeek
+    setGlobalDateRange(prev => {
+      if (prev?.from?.getTime() === firstDayOfWeek.getTime() && prev?.to?.getTime() === lastDayOfWeek.getTime()) {
+        return prev;
+      }
+      return {
+        from: firstDayOfWeek,
+        to: lastDayOfWeek
+      };
     });
   }, [selectedWeek, numWeeks]);
 
@@ -184,6 +212,52 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       console.log(`Fetching from ${start} to ${end}`);
       const result = await fetchRangeData(start, end);
       console.log('Fetched data:', result);
+
+      if (result) {
+        // Sync configs automatically from the same response
+        if (result.configs) {
+          setConfigs(result.configs);
+        } else if (result.config) {
+          setConfigs([result.config]);
+        }
+
+        // Sync targets automatically from the same response
+        if (result.targets) {
+          setTargets((prevTargets: any) => {
+            const newTargets = { ...prevTargets };
+            result.targets.forEach((t: any) => {
+              let rowId = '';
+              const cat = String(t.category || '').toLowerCase();
+              if (cat.includes('bic') && cat.includes('scrap')) rowId = 'bic_scrap';
+              else if (cat.includes('ply') && cat.includes('scrap')) rowId = 'ply_scrap';
+              else if (cat.includes('rubber') && cat.includes('scrap')) rowId = 'rubber_scrap';
+              else if (cat.includes('rn') && cat.includes('scrap')) rowId = 'rn_scrap';
+              else if (cat.includes('bic') && cat.includes('rate')) rowId = 'bic_rate';
+              else if (cat.includes('ply') && cat.includes('rate')) rowId = 'ply_rate';
+              else if (cat.includes('rubber') && cat.includes('rate')) rowId = 'rubber_rate';
+              else if (cat.includes('rn') && cat.includes('rate')) rowId = 'rn_rate';
+              
+              if (rowId) {
+                const period = String(t.period || '').toLowerCase();
+                newTargets[rowId] = {
+                  value: Number(t.value || 0),
+                  period: period === 'not use' ? 'not_use' : (['daily', 'weekly', 'monthly', 'not_use'].includes(period) ? period : 'daily')
+                };
+              }
+            });
+            return newTargets;
+          });
+        }
+
+        // Sync custom scrap parameters automatically from the same response
+        if (result.scrapPicRequirements) {
+          setScrapPicRequirements(result.scrapPicRequirements);
+        }
+        if (result.materialReasons) {
+          setMaterialReasons(result.materialReasons);
+        }
+      }
+
       setData(result);
       setLastFetchRange({ start, end });
     } catch (err: any) {
@@ -275,16 +349,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    loadTargets();
-  }, [loadTargets]);
-
-  useEffect(() => {
-    loadScrapSettings();
-  }, [loadScrapSettings]);
-
-  useEffect(() => {
     loadData();
   }, [globalDateRange, loadData]);
+
+  useEffect(() => {
+    loadTargets();
+    loadScrapSettings();
+  }, [loadTargets, loadScrapSettings]);
 
   return (
     <DataContext.Provider value={{ 

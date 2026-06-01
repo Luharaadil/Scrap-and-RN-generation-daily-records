@@ -20,6 +20,9 @@ function getSheetTimeZone() {
 
 // 1. INITIAL SETUP
 function setupSheets() {
+  const cache = CacheService.getScriptCache();
+  if (cache.get('sheets_initialized') === 'true') return;
+
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   
   if (!ss.getSheetByName(SUMMARY_SHEET_NAME)) {
@@ -30,9 +33,12 @@ function setupSheets() {
   if (!scrapSheet) {
     ss.insertSheet(SCRAP_SHEET_NAME).appendRow(['Date', 'Material', 'Weight', 'Reason', 'ImageURL', 'Shift', 'Section', 'MaterialName', 'Timestamp', 'Reason for Scrap', 'Machine No', 'Operator Id', 'User']);
   } else {
-    const headers = scrapSheet.getRange(1, 1, 1, scrapSheet.getLastColumn()).getValues()[0];
-    if (headers.indexOf('User') === -1) {
-      scrapSheet.getRange(1, 13).setValue('User');
+    const lastCol = scrapSheet.getLastColumn();
+    if (lastCol < 13) {
+      const headers = scrapSheet.getRange(1, 1, 1, lastCol).getValues()[0];
+      if (headers.indexOf('User') === -1) {
+        scrapSheet.getRange(1, 13).setValue('User');
+      }
     }
   }
 
@@ -42,6 +48,8 @@ function setupSheets() {
   if (!ss.getSheetByName(USERS_SHEET_NAME)) {
     ss.insertSheet(USERS_SHEET_NAME).appendRow(['ID', 'Password', 'Role']);
   }
+
+  cache.put('sheets_initialized', 'true', 21600); // 6 hours
 }
 
 function formatDateString(dateValue) {
@@ -105,7 +113,40 @@ function doGet(e) {
       machineNo: row[10], operatorId: row[11], user: row[12]
     }));
 
-    return createJsonResponse({ summaries, scraps });
+    // --- INCLUDE EXTRA SETTINGS TO FACILITATE ONE-SHOT NETWORK LOADING ---
+    const summarySheet = ss.getSheetByName(SUMMARY_SHEET_NAME);
+    const lastRow = summarySheet.getLastRow();
+    let targets = [];
+    let configs = [];
+    if (lastRow >= 2) {
+      const targetData = summarySheet.getRange("Z2:AB" + lastRow).getValues();
+      targets = targetData.map(row => ({ category: row[0], period: row[1], value: row[2] })).filter(t => t.category);
+      const configData = summarySheet.getRange("AC2:AD" + lastRow).getValues();
+      configs = configData.map(row => ({ id: String(row[0] || '').trim(), password: String(row[1] || '').trim() })).filter(c => c.id && c.password);
+    }
+
+    const settingsSheet = ss.getSheetByName(SETTINGS_SHEET_NAME);
+    let scrapPicRequirements = null;
+    let materialReasons = null;
+    if (settingsSheet) {
+      const data = settingsSheet.getDataRange().getValues();
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === 'scrapPicRequirements') {
+          try { scrapPicRequirements = JSON.parse(data[i][1]); } catch (err) {}
+        } else if (data[i][0] === 'materialReasons') {
+          try { materialReasons = JSON.parse(data[i][1]); } catch (err) {}
+        }
+      }
+    }
+
+    return createJsonResponse({ 
+      summaries: summaries, 
+      scraps: scraps,
+      targets: targets,
+      configs: configs,
+      scrapPicRequirements: scrapPicRequirements,
+      materialReasons: materialReasons
+    });
   }
   
   if (action === 'getCustomRanges') {
@@ -176,20 +217,14 @@ function doPost(e) {
 // 4. OPTIONS (CORS Support)
 function doOptions(e) {
   return ContentService.createTextOutput('')
-    .setMimeType(ContentService.MimeType.TEXT)
-    .setHeader('Access-Control-Allow-Origin', '*')
-    .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-    .setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    .setMimeType(ContentService.MimeType.TEXT);
 }
 
 // --- HELPER FUNCTIONS ---
 
 function createJsonResponse(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
-    .setMimeType(ContentService.MimeType.JSON)
-    .setHeader('Access-Control-Allow-Origin', '*')
-    .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-    .setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 function saveUser(data) {
