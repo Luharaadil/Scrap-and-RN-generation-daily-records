@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { format, subDays } from 'date-fns';
-import { Calendar as CalendarIcon, Loader2, RefreshCw, ImageIcon, Check, Edit2, Save, X, Trash } from 'lucide-react';
+import { Calendar as CalendarIcon, Loader2, RefreshCw, ImageIcon, Check, Edit2, Save, X, Trash, Copy } from 'lucide-react';
 import { DateRange } from 'react-day-picker';
 import { Calendar } from '@/src/components/ui/calendar';
 import { toBlob } from 'html-to-image';
@@ -52,6 +52,14 @@ export function Dashboard() {
   const summaryRef = useRef<HTMLDivElement>(null);
   const scrapTableRef = useRef<HTMLDivElement>(null);
 
+  const bicCardRef = useRef<HTMLDivElement>(null);
+  const plyCardRef = useRef<HTMLDivElement>(null);
+  const rubberCardRef = useRef<HTMLDivElement>(null);
+  const rnCardRef = useRef<HTMLDivElement>(null);
+  const otherCardRef = useRef<HTMLDivElement>(null);
+
+  const [copiedCards, setCopiedCards] = useState<Record<string, boolean>>({});
+
   const copyAsPicture = async (ref: React.RefObject<HTMLDivElement>, setCopied: (v: boolean) => void) => {
     if (!ref.current) return;
     try {
@@ -90,8 +98,37 @@ export function Dashboard() {
     }
   };
 
+  const copyCardAsPicture = async (ref: React.RefObject<HTMLDivElement>, cardId: string) => {
+    if (!ref.current) return;
+    try {
+      const blob = await toBlob(ref.current, { 
+        backgroundColor: '#ffffff',
+        pixelRatio: 2,
+        filter: (node) => {
+          if (node instanceof HTMLElement) {
+            return node.getAttribute('data-img-export-ignore') !== 'true';
+          }
+          return true;
+        }
+      });
+
+      if (!blob) return;
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      setCopiedCards(prev => ({ ...prev, [cardId]: true }));
+      setTimeout(() => setCopiedCards(prev => ({ ...prev, [cardId]: false })), 2000);
+    } catch (err) {
+      console.error('Failed to copy card picture', err);
+    }
+  };
+
   const startDateStr = date?.from ? format(date.from, 'yyyy-MM-dd') : null;
   const endDateStr = date?.to ? format(date.to, 'yyyy-MM-dd') : startDateStr;
+
+  const dateRangeLabel = date?.from 
+    ? (date.to 
+        ? `${format(date.from, 'dd-MM-yyyy')} to ${format(date.to, 'dd-MM-yyyy')}` 
+        : `${format(date.from, 'dd-MM-yyyy')} to ${format(date.from, 'dd-MM-yyyy')}`)
+    : '';
 
   const rawSummary = data?.summaries?.filter((s: any) => {
     if (!startDateStr) return false;
@@ -463,171 +500,281 @@ export function Dashboard() {
       )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5" ref={summaryRef}>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xl">BIC (鋼絲)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-1 text-base">
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground text-sm">Usage:</span>
-                <span className="font-medium text-lg">{formatValue(summary.bicUsage, 'kg')}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground text-sm">Scrap:</span>
-                <span className="font-medium text-red-600 text-lg">{formatValue(displayBicScrap, 'kg')}</span>
-              </div>
-              <div className="flex justify-between border-t pt-1 mt-1 items-center">
-                <span className="text-muted-foreground text-sm">Scrap Rate:</span>
-                <span className="font-bold text-lg">{hasData ? (calculateRate(displayBicScrap, summary.bicUsage) ?? '0') : ''}</span>
-              </div>
-              {hasData && (
-                <div className="mt-2 pt-2 border-t border-dashed text-sm space-y-1">
-                  {getMaterialSections('BIC').map(section => (
-                    <div key={section} className="flex justify-between text-gray-500">
-                      <span className="text-base">{section}:</span>
-                      <span className="text-base">{getSectionScrapTotal('BIC', section).toFixed(1)} kg</span>
-                    </div>
-                  ))}
-                  {getMaterialSections('BIC').length === 0 && (
-                    <div className="text-center text-gray-400 italic">No section data</div>
-                  )}
+        <Card ref={bicCardRef} className="flex flex-col justify-between">
+          <div>
+            <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-xl">BIC (鋼絲)</CardTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-gray-400 hover:text-gray-900"
+                data-img-export-ignore="true"
+                onClick={() => copyCardAsPicture(bicCardRef, 'bic')}
+                title="Copy box as image"
+              >
+                {copiedCards['bic'] ? (
+                  <Check className="h-4 w-4 text-green-600" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1 text-base">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground text-sm">Usage:</span>
+                  <span className="font-medium text-lg">{formatValue(summary.bicUsage, 'kg')}</span>
                 </div>
-              )}
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground text-sm">Scrap:</span>
+                  <span className="font-medium text-red-600 text-lg">{formatValue(displayBicScrap, 'kg')}</span>
+                </div>
+                <div className="flex justify-between border-t pt-1 mt-1 items-center">
+                  <span className="text-muted-foreground text-sm">Scrap Rate:</span>
+                  <span className="font-bold text-lg">{hasData ? (calculateRate(displayBicScrap, summary.bicUsage) ?? '0') : ''}</span>
+                </div>
+                {hasData && (
+                  <div className="mt-2 pt-2 border-t border-dashed text-sm space-y-1">
+                    {getMaterialSections('BIC').map(section => (
+                      <div key={section} className="flex justify-between text-gray-500">
+                        <span className="text-base">{section}:</span>
+                        <span className="text-base">{getSectionScrapTotal('BIC', section).toFixed(1)} kg</span>
+                      </div>
+                    ))}
+                    {getMaterialSections('BIC').length === 0 && (
+                      <div className="text-center text-gray-400 italic">No section data</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </div>
+          <div className="px-6 pb-4">
+            <div className="pt-2 border-t border-gray-100 text-[11px] text-muted-foreground flex justify-between items-center font-mono">
+              <span>Period:</span>
+              <span className="font-semibold text-gray-600">{dateRangeLabel}</span>
             </div>
-          </CardContent>
+          </div>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xl">PLY/CH (簾紗/柴弗)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-1 text-base">
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground text-sm">Usage:</span>
-                <span className="font-medium text-lg">{formatValue(summary.plyUsage, 'kg')}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground text-sm">Scrap:</span>
-                <span className="font-medium text-red-600 text-lg">{formatValue(displayPlyScrap, 'kg')}</span>
-              </div>
-              <div className="flex justify-between border-t pt-1 mt-1 items-center">
-                <span className="text-muted-foreground text-sm">Scrap Rate:</span>
-                <span className="font-bold text-lg">{hasData ? (calculateRate(displayPlyScrap, summary.plyUsage) ?? '0') : ''}</span>
-              </div>
-              {hasData && (
-                <div className="mt-2 pt-2 border-t border-dashed text-sm space-y-1">
-                  {getPlySections().map(section => (
-                    <div key={section} className="flex justify-between text-gray-500">
-                      <span className="text-base">{section}:</span>
-                      <span className="text-base">{getPlySectionTotal(section).toFixed(1)} kg</span>
-                    </div>
-                  ))}
-                  {getPlySections().length === 0 && (
-                    <div className="text-center text-gray-400 italic">No section data</div>
-                  )}
+        <Card ref={plyCardRef} className="flex flex-col justify-between">
+          <div>
+            <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-xl">PLY/CH (簾紗/柴弗)</CardTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-gray-400 hover:text-gray-900"
+                data-img-export-ignore="true"
+                onClick={() => copyCardAsPicture(plyCardRef, 'ply')}
+                title="Copy box as image"
+              >
+                {copiedCards['ply'] ? (
+                  <Check className="h-4 w-4 text-green-600" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1 text-base">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground text-sm">Usage:</span>
+                  <span className="font-medium text-lg">{formatValue(summary.plyUsage, 'kg')}</span>
                 </div>
-              )}
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground text-sm">Scrap:</span>
+                  <span className="font-medium text-red-600 text-lg">{formatValue(displayPlyScrap, 'kg')}</span>
+                </div>
+                <div className="flex justify-between border-t pt-1 mt-1 items-center">
+                  <span className="text-muted-foreground text-sm">Scrap Rate:</span>
+                  <span className="font-bold text-lg">{hasData ? (calculateRate(displayPlyScrap, summary.plyUsage) ?? '0') : ''}</span>
+                </div>
+                {hasData && (
+                  <div className="mt-2 pt-2 border-t border-dashed text-sm space-y-1">
+                    {getPlySections().map(section => (
+                      <div key={section} className="flex justify-between text-gray-500">
+                        <span className="text-base">{section}:</span>
+                        <span className="text-base">{getPlySectionTotal(section).toFixed(1)} kg</span>
+                      </div>
+                    ))}
+                    {getPlySections().length === 0 && (
+                      <div className="text-center text-gray-400 italic">No section data</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </div>
+          <div className="px-6 pb-4">
+            <div className="pt-2 border-t border-gray-100 text-[11px] text-muted-foreground flex justify-between items-center font-mono">
+              <span>Period:</span>
+              <span className="font-semibold text-gray-600">{dateRangeLabel}</span>
             </div>
-          </CardContent>
+          </div>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xl">Rubber (膠料)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-1 text-base">
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground text-sm">Usage:</span>
-                <span className="font-medium text-lg">{formatValue(summary.rubberUsage, 'kg')}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground text-sm">Scrap:</span>
-                <span className="font-medium text-red-600 text-lg">{formatValue(displayRubberScrap, 'kg')}</span>
-              </div>
-              <div className="flex justify-between border-t pt-1 mt-1 items-center">
-                <span className="text-muted-foreground text-sm">Scrap Rate:</span>
-                <span className="font-bold text-lg">{hasData ? (calculateRate(displayRubberScrap, summary.rubberUsage) ?? '0') : ''}</span>
-              </div>
-              {hasData && (
-                <div className="mt-2 pt-2 border-t border-dashed text-sm space-y-1">
-                  {getRubberSections().map(section => (
-                    <div key={section} className="flex justify-between text-gray-500">
-                      <span className="text-base">{section}:</span>
-                      <span className="text-base">{getRubberSectionTotal(section).toFixed(1)} kg</span>
-                    </div>
-                  ))}
-                  {getRubberSections().length === 0 && (
-                    <div className="text-center text-gray-400 italic">No section data</div>
-                  )}
+        <Card ref={rubberCardRef} className="flex flex-col justify-between">
+          <div>
+            <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-xl">Rubber (膠料)</CardTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-gray-400 hover:text-gray-900"
+                data-img-export-ignore="true"
+                onClick={() => copyCardAsPicture(rubberCardRef, 'rubber')}
+                title="Copy box as image"
+              >
+                {copiedCards['rubber'] ? (
+                  <Check className="h-4 w-4 text-green-600" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1 text-base">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground text-sm">Usage:</span>
+                  <span className="font-medium text-lg">{formatValue(summary.rubberUsage, 'kg')}</span>
                 </div>
-              )}
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground text-sm">Scrap:</span>
+                  <span className="font-medium text-red-600 text-lg">{formatValue(displayRubberScrap, 'kg')}</span>
+                </div>
+                <div className="flex justify-between border-t pt-1 mt-1 items-center">
+                  <span className="text-muted-foreground text-sm">Scrap Rate:</span>
+                  <span className="font-bold text-lg">{hasData ? (calculateRate(displayRubberScrap, summary.rubberUsage) ?? '0') : ''}</span>
+                </div>
+                {hasData && (
+                  <div className="mt-2 pt-2 border-t border-dashed text-sm space-y-1">
+                    {getRubberSections().map(section => (
+                      <div key={section} className="flex justify-between text-gray-500">
+                        <span className="text-base">{section}:</span>
+                        <span className="text-base">{getRubberSectionTotal(section).toFixed(1)} kg</span>
+                      </div>
+                    ))}
+                    {getRubberSections().length === 0 && (
+                      <div className="text-center text-gray-400 italic">No section data</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </div>
+          <div className="px-6 pb-4">
+            <div className="pt-2 border-t border-gray-100 text-[11px] text-muted-foreground flex justify-between items-center font-mono">
+              <span>Period:</span>
+              <span className="font-semibold text-gray-600">{dateRangeLabel}</span>
             </div>
-          </CardContent>
+          </div>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xl">RN Generation</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-1 text-base">
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground text-sm">Rubber Usage:</span>
-                <span className="font-medium text-lg">{formatValue(summary.extrusionRubberUsage, 'kg')}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground text-sm">RN Scrap:</span>
-                <span className="font-medium text-red-600 text-lg">{formatValue(displayRnScrap, 'kg')}</span>
-              </div>
-              <div className="flex justify-between border-t pt-1 mt-1 items-center">
-                <span className="text-muted-foreground text-sm">Scrap Rate:</span>
-                <span className="font-bold text-lg">{hasData ? (calculateRate(displayRnScrap, summary.extrusionRubberUsage) ?? '0') : ''}</span>
-              </div>
-              {hasData && (
-                <div className="mt-2 pt-2 border-t border-dashed text-sm space-y-1">
-                  {getRnSections().map(section => (
-                    <div key={section} className="flex justify-between text-gray-500">
-                      <span className="text-base">{section}:</span>
-                      <span className="text-base">{getRnSectionTotal(section).toFixed(1)} kg</span>
-                    </div>
-                  ))}
-                  {getRnSections().length === 0 && (
-                    <div className="text-center text-gray-400 italic">No section data</div>
-                  )}
+        <Card ref={rnCardRef} className="flex flex-col justify-between">
+          <div>
+            <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-xl">RN Generation</CardTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-gray-400 hover:text-gray-900"
+                data-img-export-ignore="true"
+                onClick={() => copyCardAsPicture(rnCardRef, 'rn')}
+                title="Copy box as image"
+              >
+                {copiedCards['rn'] ? (
+                  <Check className="h-4 w-4 text-green-600" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1 text-base">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground text-sm">Rubber Usage:</span>
+                  <span className="font-medium text-lg">{formatValue(summary.extrusionRubberUsage, 'kg')}</span>
                 </div>
-              )}
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground text-sm">RN Generation:</span>
+                  <span className="font-medium text-red-600 text-lg">{formatValue(displayRnScrap, 'kg')}</span>
+                </div>
+                <div className="flex justify-between border-t pt-1 mt-1 items-center">
+                  <span className="text-muted-foreground text-sm">RN Generation Rate:</span>
+                  <span className="font-bold text-lg">{hasData ? (calculateRate(displayRnScrap, summary.extrusionRubberUsage) ?? '0') : ''}</span>
+                </div>
+                {hasData && (
+                  <div className="mt-2 pt-2 border-t border-dashed text-sm space-y-1">
+                    {getRnSections().map(section => (
+                      <div key={section} className="flex justify-between text-gray-500">
+                        <span className="text-base">{section}:</span>
+                        <span className="text-base">{getRnSectionTotal(section).toFixed(1)} kg</span>
+                      </div>
+                    ))}
+                    {getRnSections().length === 0 && (
+                      <div className="text-center text-gray-400 italic">No section data</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </div>
+          <div className="px-6 pb-4">
+            <div className="pt-2 border-t border-gray-100 text-[11px] text-muted-foreground flex justify-between items-center font-mono">
+              <span>Period:</span>
+              <span className="font-semibold text-gray-600">{dateRangeLabel}</span>
             </div>
-          </CardContent>
+          </div>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xl">Other Scraps</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-1 text-base">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-muted-foreground text-sm">Total:</span>
-                <span className="font-medium text-red-600 text-lg">{formatValue(displayOtherScrap, 'kg')}</span>
-              </div>
-              {hasData && (
-                <div className="mt-2 pt-2 border-t border-dashed text-sm space-y-1 max-h-[120px] overflow-y-auto pr-1">
-                  {getOtherCategories().map(([category, weight]) => (
-                    <div key={category} className="flex justify-between text-gray-500 text-sm">
-                      <span className="truncate mr-2 flex-1" title={category}>{category}:</span>
-                      <span className="whitespace-nowrap font-medium text-gray-700">{weight.toFixed(1)}</span>
-                    </div>
-                  ))}
-                  {getOtherCategories().length === 0 && (
-                    <div className="text-center text-gray-400 italic">No other scrap</div>
-                  )}
+        <Card ref={otherCardRef} className="flex flex-col justify-between">
+          <div>
+            <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-xl">Other Scraps</CardTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-gray-400 hover:text-gray-900"
+                data-img-export-ignore="true"
+                onClick={() => copyCardAsPicture(otherCardRef, 'other')}
+                title="Copy box as image"
+              >
+                {copiedCards['other'] ? (
+                  <Check className="h-4 w-4 text-green-600" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1 text-base">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-muted-foreground text-sm">Total:</span>
+                  <span className="font-medium text-red-600 text-lg">{formatValue(displayOtherScrap, 'kg')}</span>
                 </div>
-              )}
+                {hasData && (
+                  <div className="mt-2 pt-2 border-t border-dashed text-sm space-y-1 max-h-[120px] overflow-y-auto pr-1">
+                    {getOtherCategories().map(([category, weight]) => (
+                      <div key={category} className="flex justify-between text-gray-500 text-sm">
+                        <span className="truncate mr-2 flex-1" title={category}>{category}:</span>
+                        <span className="whitespace-nowrap font-medium text-gray-700">{weight.toFixed(1)}</span>
+                      </div>
+                    ))}
+                    {getOtherCategories().length === 0 && (
+                      <div className="text-center text-gray-400 italic">No other scrap</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </div>
+          <div className="px-6 pb-4">
+            <div className="pt-2 border-t border-gray-100 text-[11px] text-muted-foreground flex justify-between items-center font-mono">
+              <span>Period:</span>
+              <span className="font-semibold text-gray-600">{dateRangeLabel}</span>
             </div>
-          </CardContent>
+          </div>
         </Card>
       </div>
 
