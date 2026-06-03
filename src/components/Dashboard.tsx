@@ -708,7 +708,7 @@ export function Dashboard() {
                   <div className="mt-2 pt-2 border-t border-dashed text-sm space-y-1">
                     {getRnSections().map(section => {
                       const sectionTotal = getRnSectionTotal(section);
-                      const percentage = displayRnScrap > 0 ? ((sectionTotal / displayRnScrap) * 100).toFixed(1) : '0.0';
+                      const percentage = summary.extrusionRubberUsage > 0 ? ((sectionTotal / summary.extrusionRubberUsage) * 100).toFixed(1) : '0.0';
                       
                       // Map long section names to shorter words
                       let displaySection = section;
