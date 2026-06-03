@@ -706,12 +706,24 @@ export function Dashboard() {
                 </div>
                 {hasData && (
                   <div className="mt-2 pt-2 border-t border-dashed text-sm space-y-1">
-                    {getRnSections().map(section => (
-                      <div key={section} className="flex justify-between text-gray-500">
-                        <span className="text-base">{section}:</span>
-                        <span className="text-base">{getRnSectionTotal(section).toFixed(1)} kg</span>
-                      </div>
-                    ))}
+                    {getRnSections().map(section => {
+                      const sectionTotal = getRnSectionTotal(section);
+                      const percentage = displayRnScrap > 0 ? ((sectionTotal / displayRnScrap) * 100).toFixed(1) : '0.0';
+                      
+                      // Map long section names to shorter words
+                      let displaySection = section;
+                      const sLower = section.toLowerCase();
+                      if (sLower === 'calendering') displaySection = 'Calen.';
+                      else if (sLower === 'extrusion') displaySection = 'Extr.';
+                      else if (sLower === 'tire building') displaySection = 'Tire Bldg.';
+                      
+                      return (
+                        <div key={section} className="flex justify-between items-center text-gray-500 text-xs">
+                          <span>{displaySection}:</span>
+                          <span className="font-medium text-gray-700">{sectionTotal.toFixed(1)} kg ({percentage}%)</span>
+                        </div>
+                      );
+                    })}
                     {getRnSections().length === 0 && (
                       <div className="text-center text-gray-400 italic">No section data</div>
                     )}
