@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { format, startOfWeek, endOfWeek, eachDayOfInterval, getDate, getDay, startOfMonth, startOfYear, isSameMonth, isSameWeek } from 'date-fns';
-import { Calendar as CalendarIcon, Loader2, RefreshCw, Copy, Image as ImageIcon, Check, X, Type, Plus, Minus, Save, Edit2 } from 'lucide-react';
+import { format, startOfWeek, endOfWeek, eachDayOfInterval, getDate, getDay, startOfMonth, startOfYear, isSameMonth, isSameWeek, subDays, addDays } from 'date-fns';
+import { Calendar as CalendarIcon, Loader2, RefreshCw, Copy, Image as ImageIcon, Check, X, Type, Plus, Minus, Save, Edit2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toBlob } from 'html-to-image';
 import { Calendar } from '@/src/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/src/components/ui/popover';
@@ -57,6 +57,20 @@ export function MainReport() {
       ...prev,
       [rowId]: Math.max(8, (prev[rowId] || 17) + delta)
     }));
+  };
+
+  const handlePrevDay = () => {
+    if (!date || !date.from) return;
+    const newFrom = subDays(date.from, 1);
+    const newTo = date.to ? subDays(date.to, 1) : newFrom;
+    setDate({ from: newFrom, to: newTo });
+  };
+
+  const handleNextDay = () => {
+    if (!date || !date.from) return;
+    const newFrom = addDays(date.from, 1);
+    const newTo = date.to ? addDays(date.to, 1) : newFrom;
+    setDate({ from: newFrom, to: newTo });
   };
 
   useEffect(() => {
@@ -672,34 +686,58 @@ export function MainReport() {
                 </Select>
               </div>
 
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-10 font-bold">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {date?.from ? (
-                      date.to ? (
-                        <>
-                          {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}
-                        </>
-                      ) : (
-                        format(date.from, "LLL dd, y")
-                      )
-                    ) : (
-                      <span>Pick a date range</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="end">
-                  <Calendar
-                    initialFocus
-                    mode="range"
-                    defaultMonth={date?.from}
-                    selected={date}
-                    onSelect={setDate}
-                    numberOfMonths={1}
-                  />
-                </PopoverContent>
-              </Popover>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handlePrevDay}
+                  className="h-10 w-10 font-bold"
+                  title="Previous Day"
+                  id="report-prev-day-btn"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-10 font-bold max-w-[240px]">
+                      <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                      <span className="truncate">
+                        {date?.from ? (
+                          date.to ? (
+                            <>
+                              {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}
+                            </>
+                          ) : (
+                            format(date.from, "LLL dd, y")
+                          )
+                        ) : (
+                          <span>Pick a date range</span>
+                        )}
+                      </span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                      initialFocus
+                      mode="range"
+                      defaultMonth={date?.from}
+                      selected={date}
+                      onSelect={setDate}
+                      numberOfMonths={1}
+                    />
+                  </PopoverContent>
+                </Popover>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleNextDay}
+                  className="h-10 w-10 font-bold"
+                  title="Next Day"
+                  id="report-next-day-btn"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
               {isAdmin && (
                 <Button 
                   variant="ghost" 
