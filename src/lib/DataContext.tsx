@@ -194,16 +194,31 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const loadData = useCallback(async (force = false, customStart?: string, customEnd?: string) => {
     if (!getWebAppUrl()) return;
     
-    // Default range is start of previous month to end of current week + some buffer
-    // To handle cross-month scenarios (like when globalDateRange spans previous month)
+    // Default range starts at least 2 months ago (to ensure previous months' data is preloaded for fast dashboard switches)
+    // and handles custom ranges or earlier ranges if requested.
     const now = new Date();
     const prevMonth = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+    const prevMonthStr = format(prevMonth, 'yyyy-MM-dd');
     
-    const start = customStart || (globalDateRange?.from ? format(startOfMonth(globalDateRange.from), 'yyyy-MM-dd') : format(prevMonth, 'yyyy-MM-dd'));
+    let computedStart = prevMonthStr;
+    if (globalDateRange?.from) {
+      const gStart = format(startOfMonth(globalDateRange.from), 'yyyy-MM-dd');
+      // If the selected global date range starts even earlier than 2 months ago, use gStart
+      if (gStart < computedStart) {
+        computedStart = gStart;
+      }
+    }
+    
+    const start = customStart || computedStart;
     const end = customEnd || (globalDateRange?.to ? format(new Date(globalDateRange.to.getTime() + 14 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd') : format(new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'));
 
-    if (!force && dataRef.current && lastFetchRangeRef.current?.start === start && lastFetchRangeRef.current?.end === end) {
-      return;
+    if (!force && dataRef.current && lastFetchRangeRef.current) {
+      const isStartCovered = start >= lastFetchRangeRef.current.start;
+      const isEndCovered = end <= lastFetchRangeRef.current.end;
+      if (isStartCovered && isEndCovered) {
+        console.log('Skipping API load because requested range is already fully covered by in-memory cache:', { requested: { start, end }, loaded: lastFetchRangeRef.current });
+        return;
+      }
     }
 
     setLoading(true);

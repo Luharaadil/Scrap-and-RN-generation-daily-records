@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { format, subDays, addDays } from 'date-fns';
+import { format, subDays, addDays, startOfMonth } from 'date-fns';
 import { Calendar as CalendarIcon, Loader2, RefreshCw, ImageIcon, Check, Edit2, Save, X, Trash, Copy, ChevronLeft, ChevronRight } from 'lucide-react';
 import { DateRange } from 'react-day-picker';
 import { Calendar } from '@/src/components/ui/calendar';
@@ -73,6 +73,10 @@ export function Dashboard() {
     const newTo = date.to ? addDays(date.to, 1) : newFrom;
     setDate({ from: newFrom, to: newTo });
   };
+
+  
+  // No auto-load on date change to ensure manual-only reload when manually clicked, preventing slow network hits
+
 
   const copyAsPicture = async (ref: React.RefObject<HTMLDivElement>, setCopied: (v: boolean) => void) => {
     if (!ref.current) return;
@@ -188,26 +192,26 @@ export function Dashboard() {
     if (sectionFilter !== 'All' && scrap.section !== sectionFilter) return false;
     if (materialFilter !== 'All' && scrap.material !== materialFilter) return false;
     
-    if (colFilters.shift && !scrap.shift?.toLowerCase().includes(colFilters.shift.toLowerCase())) return false;
-    if (colFilters.section && !scrap.section?.toLowerCase().includes(colFilters.section.toLowerCase())) return false;
-    if (colFilters.material && !scrap.material?.toLowerCase().includes(colFilters.material.toLowerCase())) return false;
-    if (colFilters.materialName && !scrap.materialName?.toLowerCase().includes(colFilters.materialName.toLowerCase())) return false;
-    if (colFilters.machineNo && !scrap.machineNo?.toLowerCase().includes(colFilters.machineNo.toLowerCase())) return false;
-    if (colFilters.operatorId && !scrap.operatorId?.toLowerCase().includes(colFilters.operatorId.toLowerCase())) return false;
-    if (colFilters.mainReason && !scrap.mainReason?.toLowerCase().includes(colFilters.mainReason.toLowerCase())) return false;
-    if (colFilters.reason && !scrap.reason?.toLowerCase().includes(colFilters.reason.toLowerCase())) return false;
+    if (colFilters.shift && !String(scrap.shift ?? '').toLowerCase().includes(colFilters.shift.toLowerCase())) return false;
+    if (colFilters.section && !String(scrap.section ?? '').toLowerCase().includes(colFilters.section.toLowerCase())) return false;
+    if (colFilters.material && !String(scrap.material ?? '').toLowerCase().includes(colFilters.material.toLowerCase())) return false;
+    if (colFilters.materialName && !String(scrap.materialName ?? '').toLowerCase().includes(colFilters.materialName.toLowerCase())) return false;
+    if (colFilters.machineNo && !String(scrap.machineNo ?? '').toLowerCase().includes(colFilters.machineNo.toLowerCase())) return false;
+    if (colFilters.operatorId && !String(scrap.operatorId ?? '').toLowerCase().includes(colFilters.operatorId.toLowerCase())) return false;
+    if (colFilters.mainReason && !String(scrap.mainReason ?? '').toLowerCase().includes(colFilters.mainReason.toLowerCase())) return false;
+    if (colFilters.reason && !String(scrap.reason ?? '').toLowerCase().includes(colFilters.reason.toLowerCase())) return false;
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       const matches = 
-        scrap.shift?.toLowerCase().includes(q) ||
-        scrap.section?.toLowerCase().includes(q) ||
-        scrap.material?.toLowerCase().includes(q) ||
-        scrap.materialName?.toLowerCase().includes(q) ||
-        scrap.mainReason?.toLowerCase().includes(q) ||
-        scrap.reason?.toLowerCase().includes(q) ||
-        scrap.operatorId?.toLowerCase().includes(q) ||
-        scrap.machineNo?.toLowerCase().includes(q);
+        String(scrap.shift ?? '').toLowerCase().includes(q) ||
+        String(scrap.section ?? '').toLowerCase().includes(q) ||
+        String(scrap.material ?? '').toLowerCase().includes(q) ||
+        String(scrap.materialName ?? '').toLowerCase().includes(q) ||
+        String(scrap.mainReason ?? '').toLowerCase().includes(q) ||
+        String(scrap.reason ?? '').toLowerCase().includes(q) ||
+        String(scrap.operatorId ?? '').toLowerCase().includes(q) ||
+        String(scrap.machineNo ?? '').toLowerCase().includes(q);
       if (!matches) return false;
     }
     return true;
@@ -526,7 +530,22 @@ export function Dashboard() {
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="icon" onClick={() => loadData(true)} disabled={loading} className="h-10 w-10 shrink-0">
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={() => {
+              if (date?.from) {
+                const startStr = format(startOfMonth(date.from), 'yyyy-MM-dd');
+                const baseEnd = date.to || date.from;
+                const endStr = format(addDays(baseEnd, 14), 'yyyy-MM-dd');
+                loadData(true, startStr, endStr);
+              } else {
+                loadData(true);
+              }
+            }} 
+            disabled={loading} 
+            className="h-10 w-10 shrink-0"
+          >
             <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
           </Button>
         </div>
@@ -843,112 +862,114 @@ export function Dashboard() {
           </Button>
         </CardHeader>
         <CardContent ref={scrapTableRef}>
-          {filteredScraps.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No scrap records found matching the current filters.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="align-top pt-3">Date</TableHead>
+                  <TableHead className="align-top pt-3 min-w-[100px]">
+                    <div className="flex flex-col gap-1">
+                      <span>Shift</span>
+                      <Input 
+                        placeholder="Filter shift..." 
+                        value={colFilters.shift}
+                        onChange={(e) => setColFilters(f => ({...f, shift: e.target.value}))}
+                        className="h-7 text-xs bg-white font-normal px-2"
+                      />
+                    </div>
+                  </TableHead>
+                  <TableHead className="align-top pt-3 min-w-[120px]">
+                    <div className="flex flex-col gap-1">
+                      <span>Section</span>
+                      <Input 
+                        placeholder="Filter section..." 
+                        value={colFilters.section}
+                        onChange={(e) => setColFilters(f => ({...f, section: e.target.value}))}
+                        className="h-7 text-xs bg-white font-normal px-2"
+                      />
+                    </div>
+                  </TableHead>
+                  <TableHead className="align-top pt-3 min-w-[120px]">
+                    <div className="flex flex-col gap-1">
+                      <span>Material Type</span>
+                      <Input 
+                        placeholder="Filter type..." 
+                        value={colFilters.material}
+                        onChange={(e) => setColFilters(f => ({...f, material: e.target.value}))}
+                        className="h-7 text-xs bg-white font-normal px-2"
+                      />
+                    </div>
+                  </TableHead>
+                  <TableHead className="align-top pt-3 min-w-[120px]">
+                    <div className="flex flex-col gap-1">
+                      <span>Material Name</span>
+                      <Input 
+                        placeholder="Filter name..." 
+                        value={colFilters.materialName}
+                        onChange={(e) => setColFilters(f => ({...f, materialName: e.target.value}))}
+                        className="h-7 text-xs bg-white font-normal px-2"
+                      />
+                    </div>
+                  </TableHead>
+                  <TableHead className="align-top pt-3 min-w-[100px]">
+                    <div className="flex flex-col gap-1">
+                      <span>Machine No</span>
+                      <Input 
+                        placeholder="Filter machine..." 
+                        value={colFilters.machineNo}
+                        onChange={(e) => setColFilters(f => ({...f, machineNo: e.target.value}))}
+                        className="h-7 text-xs bg-white font-normal px-2"
+                      />
+                    </div>
+                  </TableHead>
+                  <TableHead className="align-top pt-3 min-w-[100px]">
+                    <div className="flex flex-col gap-1">
+                      <span>Op. ID</span>
+                      <Input 
+                        placeholder="Filter operator..." 
+                        value={colFilters.operatorId}
+                        onChange={(e) => setColFilters(f => ({...f, operatorId: e.target.value}))}
+                        className="h-7 text-xs bg-white font-normal px-2"
+                      />
+                    </div>
+                  </TableHead>
+                  <TableHead className="align-top pt-3">Weight (kg)</TableHead>
+                  <TableHead className="align-top pt-3 min-w-[120px]">
+                    <div className="flex flex-col gap-1">
+                      <span>Main Reason</span>
+                      <Input 
+                        placeholder="Filter main reason..." 
+                        value={colFilters.mainReason}
+                        onChange={(e) => setColFilters(f => ({...f, mainReason: e.target.value}))}
+                        className="h-7 text-xs bg-white font-normal px-2"
+                      />
+                    </div>
+                  </TableHead>
+                  <TableHead className="align-top pt-3 min-w-[150px]">
+                    <div className="flex flex-col gap-1">
+                      <span>Reason</span>
+                      <Input 
+                        placeholder="Filter reason..." 
+                        value={colFilters.reason}
+                        onChange={(e) => setColFilters(f => ({...f, reason: e.target.value}))}
+                        className="h-7 text-xs bg-white font-normal px-2"
+                      />
+                    </div>
+                  </TableHead>
+                  <TableHead className="align-top pt-3">Picture</TableHead>
+                  <TableHead className="align-top pt-3">Recorded At</TableHead>
+                  <TableHead className="align-top pt-3">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredScraps.length === 0 ? (
                   <TableRow>
-                    <TableHead className="align-top pt-3">Date</TableHead>
-                    <TableHead className="align-top pt-3 min-w-[100px]">
-                      <div className="flex flex-col gap-1">
-                        <span>Shift</span>
-                        <Input 
-                          placeholder="Filter shift..." 
-                          value={colFilters.shift}
-                          onChange={(e) => setColFilters(f => ({...f, shift: e.target.value}))}
-                          className="h-7 text-xs bg-white font-normal px-2"
-                        />
-                      </div>
-                    </TableHead>
-                    <TableHead className="align-top pt-3 min-w-[120px]">
-                      <div className="flex flex-col gap-1">
-                        <span>Section</span>
-                        <Input 
-                          placeholder="Filter section..." 
-                          value={colFilters.section}
-                          onChange={(e) => setColFilters(f => ({...f, section: e.target.value}))}
-                          className="h-7 text-xs bg-white font-normal px-2"
-                        />
-                      </div>
-                    </TableHead>
-                    <TableHead className="align-top pt-3 min-w-[120px]">
-                      <div className="flex flex-col gap-1">
-                        <span>Material Type</span>
-                        <Input 
-                          placeholder="Filter type..." 
-                          value={colFilters.material}
-                          onChange={(e) => setColFilters(f => ({...f, material: e.target.value}))}
-                          className="h-7 text-xs bg-white font-normal px-2"
-                        />
-                      </div>
-                    </TableHead>
-                    <TableHead className="align-top pt-3 min-w-[120px]">
-                      <div className="flex flex-col gap-1">
-                        <span>Material Name</span>
-                        <Input 
-                          placeholder="Filter name..." 
-                          value={colFilters.materialName}
-                          onChange={(e) => setColFilters(f => ({...f, materialName: e.target.value}))}
-                          className="h-7 text-xs bg-white font-normal px-2"
-                        />
-                      </div>
-                    </TableHead>
-                    <TableHead className="align-top pt-3 min-w-[100px]">
-                      <div className="flex flex-col gap-1">
-                        <span>Machine No</span>
-                        <Input 
-                          placeholder="Filter machine..." 
-                          value={colFilters.machineNo}
-                          onChange={(e) => setColFilters(f => ({...f, machineNo: e.target.value}))}
-                          className="h-7 text-xs bg-white font-normal px-2"
-                        />
-                      </div>
-                    </TableHead>
-                    <TableHead className="align-top pt-3 min-w-[100px]">
-                      <div className="flex flex-col gap-1">
-                        <span>Op. ID</span>
-                        <Input 
-                          placeholder="Filter operator..." 
-                          value={colFilters.operatorId}
-                          onChange={(e) => setColFilters(f => ({...f, operatorId: e.target.value}))}
-                          className="h-7 text-xs bg-white font-normal px-2"
-                        />
-                      </div>
-                    </TableHead>
-                    <TableHead className="align-top pt-3">Weight (kg)</TableHead>
-                    <TableHead className="align-top pt-3 min-w-[120px]">
-                      <div className="flex flex-col gap-1">
-                        <span>Main Reason</span>
-                        <Input 
-                          placeholder="Filter main reason..." 
-                          value={colFilters.mainReason}
-                          onChange={(e) => setColFilters(f => ({...f, mainReason: e.target.value}))}
-                          className="h-7 text-xs bg-white font-normal px-2"
-                        />
-                      </div>
-                    </TableHead>
-                    <TableHead className="align-top pt-3 min-w-[150px]">
-                      <div className="flex flex-col gap-1">
-                        <span>Reason</span>
-                        <Input 
-                          placeholder="Filter reason..." 
-                          value={colFilters.reason}
-                          onChange={(e) => setColFilters(f => ({...f, reason: e.target.value}))}
-                          className="h-7 text-xs bg-white font-normal px-2"
-                        />
-                      </div>
-                    </TableHead>
-                    <TableHead className="align-top pt-3">Picture</TableHead>
-                    <TableHead className="align-top pt-3">Recorded At</TableHead>
-                    <TableHead className="align-top pt-3">Actions</TableHead>
+                    <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
+                      No scrap records found matching the current filters.
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredScraps.map((scrap: any, i: number) => (
+                ) : (
+                  filteredScraps.map((scrap: any, i: number) => (
                     <TableRow key={i}>
                       <TableCell className="whitespace-nowrap">{scrap.date}</TableCell>
                       <TableCell>{scrap.shift}</TableCell>
@@ -998,11 +1019,11 @@ export function Dashboard() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
