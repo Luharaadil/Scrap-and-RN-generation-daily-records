@@ -653,12 +653,10 @@ export function MainReport() {
 
       <Card className="overflow-hidden">
         <div id="mri-report-table" ref={tableRef} className="bg-white">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 relative">
-            <div className="flex-1" />
-            <CardTitle className="text-2xl text-center flex-1 whitespace-nowrap">2026 MRI Production Weekly Report</CardTitle>
+          <CardHeader className="flex flex-col md:flex-row items-center justify-between pb-2 gap-4">
+            <CardTitle className="text-2xl font-bold whitespace-nowrap">2026 MRI Production Weekly Report</CardTitle>
             {!new URLSearchParams(window.location.search).get('bot') ? (
-              <div className="flex items-center gap-2 flex-1 justify-end flex-wrap">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 justify-end">
                 <Select value={selectedWeek.toString()} onValueChange={(v) => setSelectedWeek(parseInt(v))}>
                   <SelectTrigger className="w-[120px] h-10 font-bold">
                     <SelectValue placeholder="Select Week" />
@@ -684,14 +682,12 @@ export function MainReport() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
 
-              <div className="flex items-center gap-1">
                 <Button
                   variant="outline"
                   size="icon"
                   onClick={handlePrevDay}
-                  className="h-10 w-10 font-bold"
+                  className="h-10 w-10 font-bold shrink-0"
                   title="Previous Day"
                   id="report-prev-day-btn"
                 >
@@ -699,7 +695,7 @@ export function MainReport() {
                 </Button>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-10 font-bold max-w-[240px]">
+                    <Button variant="outline" size="sm" className="h-10 font-bold max-w-[240px] shrink-0">
                       <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
                       <span className="truncate">
                         {date?.from ? (
@@ -731,28 +727,25 @@ export function MainReport() {
                   variant="outline"
                   size="icon"
                   onClick={handleNextDay}
-                  className="h-10 w-10 font-bold"
+                  className="h-10 w-10 font-bold shrink-0"
                   title="Next Day"
                   id="report-next-day-btn"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
+                {isAdmin && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-10 w-10 p-0 flex items-center justify-center shrink-0 border border-input rounded-md hover:bg-accent" 
+                    onClick={() => setIsEditingTargets(true)}
+                    title="Target Settings"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
-              {isAdmin && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-8 w-8 p-0" 
-                  onClick={() => setIsEditingTargets(true)}
-                  title="Target Settings"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-            ) : (
-              <div className="flex-1" />
-            )}
+            ) : null}
           </CardHeader>
           <CardContent className="p-0 overflow-x-auto">
             <div className="p-4">

@@ -463,72 +463,70 @@ export function Dashboard() {
           />
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => copyAsPicture(summaryRef, setCopiedSummary)} className="h-10 font-bold">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={() => copyAsPicture(summaryRef, setCopiedSummary)} className="h-10 font-bold shrink-0">
             {copiedSummary ? <Check className="h-4 w-4 sm:mr-2 text-green-600" /> : <ImageIcon className="h-4 w-4 sm:mr-2" />}
             <span className="hidden sm:inline">{copiedSummary ? 'Copied!' : 'Copy Summary Image'}</span>
             {!copiedSummary && <span className="sm:hidden">Summary</span>}
             {copiedSummary && <span className="sm:hidden">Copied</span>}
           </Button>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handlePrevDay}
-              className="h-10 w-10 font-bold"
-              title="Previous Day"
-              id="dashboard-prev-day-btn"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  id="dashboard-date-picker-btn"
-                  variant={"outline"}
-                  className={cn(
-                    "w-[240px] justify-start text-left font-normal h-10 font-bold",
-                    !date && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
-                  <span className="truncate">
-                    {date?.from ? (
-                      date.to ? (
-                        <>
-                          {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}
-                        </>
-                      ) : (
-                        format(date.from, "LLL dd, y")
-                      )
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handlePrevDay}
+            className="h-10 w-10 font-bold shrink-0"
+            title="Previous Day"
+            id="dashboard-prev-day-btn"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                id="dashboard-date-picker-btn"
+                variant={"outline"}
+                className={cn(
+                  "w-[240px] justify-start text-left font-normal h-10 font-bold shrink-0",
+                  !date && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                <span className="truncate">
+                  {date?.from ? (
+                    date.to ? (
+                      <>
+                        {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}
+                      </>
                     ) : (
-                      <span>Pick a date range</span>
-                    )}
-                  </span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
-                <Calendar
-                  initialFocus
-                  mode="range"
-                  defaultMonth={date?.from}
-                  selected={date}
-                  onSelect={setDate}
-                />
-              </PopoverContent>
-            </Popover>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleNextDay}
-              className="h-10 w-10 font-bold"
-              title="Next Day"
-              id="dashboard-next-day-btn"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-          <Button variant="outline" size="icon" onClick={() => loadData(true)} disabled={loading} className="h-10 w-10">
+                      format(date.from, "LLL dd, y")
+                    )
+                  ) : (
+                    <span>Pick a date range</span>
+                  )}
+                </span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                initialFocus
+                mode="range"
+                defaultMonth={date?.from}
+                selected={date}
+                onSelect={setDate}
+              />
+            </PopoverContent>
+          </Popover>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleNextDay}
+            className="h-10 w-10 font-bold shrink-0"
+            title="Next Day"
+            id="dashboard-next-day-btn"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="icon" onClick={() => loadData(true)} disabled={loading} className="h-10 w-10 shrink-0">
             <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
           </Button>
         </div>
